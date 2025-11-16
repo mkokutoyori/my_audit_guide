@@ -431,11 +431,762 @@ Restart-Computer -Force
 
 ---
 
-*[Guide Windows Server 2022 - Suite en cours de rédaction...]*
+## 🔐 PARTIE 2 : Comptes Utilisateurs - Qui a les Clés du Royaume ?
 
-**Les parties suivantes à venir :**
-- Partie 2 : Comptes Utilisateurs et Authentification
-- Partie 3 : Bureau à Distance (RDP)
+### 🎓 Concept : Les comptes = Les clés de ton château
+
+**Analogie :** Imagine ton serveur comme un château :
+- Le compte **Administrator** = La clé du coffre-fort royal
+- Les comptes **utilisateurs normaux** = Clés des chambres
+- Les comptes **sans mot de passe** = Portes grandes ouvertes !
+
+**Statistiques qui font peur :**
+- 81% des piratages utilisent des identifiants compromis (Verizon DBIR 2024)
+- 60% des comptes d'admin utilisent des mots de passe faibles ou réutilisés
+- Les comptes "dormants" (inactifs) représentent 30% des comptes et sont rarement surveillés
+
+**Exemples réels :**
+- **SolarWinds (2020)** : Compromission via un mot de passe faible ("solarwinds123")
+- **Colonial Pipeline (2021)** : Ransomware via un compte VPN sans MFA
+- **Target (2013)** : Accès initial via credentials d'un sous-traitant
+
+### ✅ Check #1 : Politique de Mots de Passe
+
+#### Commande : Voir la politique actuelle
+
+```powershell
+net accounts
+```
+
+**📖 Explication :**
+- `net accounts` = affiche la politique de mots de passe locale du serveur
+- C'est une commande DOS legacy mais toujours très utile !
+
+**💻 Ce que tu vas voir - CAS 1 (BIEN configuré selon CIS Benchmark) :**
+
+```
+Force user logoff how long after time expires?:       Never
+Minimum password age (days):                          1
+Maximum password age (days):                          365
+Minimum password length:                              14
+Length of password history maintained:                24
+Lockout threshold:                                    5
+Lockout duration (minutes):                           15
+Lockout observation window (minutes):                 15
+Computer role:                                        SERVER
+The command completed successfully.
+```
+
+**🔍 Analyse ligne par ligne :**
+
+| Paramètre | Valeur IDÉALE | Valeur dans l'exemple | Bon ? |
+|-----------|---------------|----------------------|-------|
+| `Minimum password age` | 1 jour | 1 | ✅ Empêche de changer trop souvent |
+| `Maximum password age` | ≤ 365 jours | 365 | ✅ CIS Level 1 conforme |
+| `Minimum password length` | ≥ 14 caractères | 14 | ✅ PARFAIT |
+| `Password history` | ≥ 24 | 24 | ✅ Empêche réutilisation |
+| `Lockout threshold` | 5 tentatives | 5 | ✅ Protection brute-force |
+| `Lockout duration` | ≥ 15 minutes | 15 | ✅ Bloque l'attaquant |
+| `Lockout observation window` | 15 minutes | 15 | ✅ Fenêtre de comptage |
+
+**🎨 Explication des paramètres clés :**
+
+**Minimum password length (14 caractères) :**
+- 8 caractères = **6 heures** pour cracker (force brute moderne)
+- 10 caractères = **5 ans** pour cracker
+- **14 caractères** = **200+ millions d'années** pour cracker
+- Conclusion : 14 = sécurité réelle !
+
+**Lockout threshold (5 tentatives) :**
+- Si quelqu'un essaie 5 mauvais mots de passe → compte verrouillé pendant 15 min
+- Bloque les attaques automatisées qui essaient des milliers de mots de passe
+
+**Password history (24) :**
+- Le serveur se souvient des 24 derniers mots de passe
+- Tu ne peux pas réutiliser "Password123" que tu avais il y a 6 mois
+
+**💻 Exemple CAS 2 (DANGER - Valeurs par défaut Windows) :**
+
+```
+Minimum password age (days):                          0
+Maximum password age (days):                          42
+Minimum password length:                              0
+Length of password history maintained:                0
+Lockout threshold:                                    Never
+```
+
+**🚨 ALERTE ROUGE :**
+
+| Problème | Risque | Gravité |
+|----------|--------|---------|
+| `Minimum length: 0` | Mots de passe vides autorisés ! | 🔴 CRITIQUE |
+| `History: 0` | Réutilisation immédiate de "Password1" | 🔴 CRITIQUE |
+| `Lockout: Never` | Attaques brute-force illimitées | 🔴 CRITIQUE |
+| `Max age: 42 jours` | Mots de passe changent trop souvent (users écrivent sur post-it) | 🟡 MOYEN |
+
+**🔧 Correction : Appliquer la politique CIS Benchmark Level 1**
+
+```powershell
+# ATTENTION : Cette commande change la politique de TOUT le serveur
+# Teste d'abord sur un serveur de test !
+
+# Configure la politique de mot de passe via net accounts
+net accounts /minpwlen:14 /maxpwage:365 /minpwage:1 /uniquepw:24
+
+# Configure le verrouillage de compte
+net accounts /lockoutthreshold:5 /lockoutduration:15 /lockoutwindow:15
+```
+
+**💻 Vérification après correction :**
+```powershell
+net accounts
+```
+
+Tu dois maintenant voir les valeurs sécurisées !
+
+**💡 Note importante :** Sur un **Domain Controller**, utilise plutôt :
+```powershell
+Get-ADDefaultDomainPasswordPolicy
+Set-ADDefaultDomainPasswordPolicy -MinPasswordLength 14 -MaxPasswordAge 365.00:00:00 -MinPasswordAge 1.00:00:00 -PasswordHistoryCount 24 -LockoutThreshold 5
+```
+
+#### Check supplémentaire : Complexité du mot de passe
+
+```powershell
+# Vérifie si la complexité est activée
+secedit /export /cfg C:\secpol.cfg
+Get-Content C:\secpol.cfg | Select-String -Pattern "PasswordComplexity"
+```
+
+**💻 Résultat attendu :**
+```
+PasswordComplexity = 1
+```
+
+**✅ `1` = Activé** (le mot de passe doit contenir au moins 3 des 4 catégories : majuscules, minuscules, chiffres, symboles)
+
+**❌ `0` = Désactivé** (mot de passe peut être "aaaaaaaaaaaa" même avec 14 caractères !)
+
+**🔧 Si désactivé, active-le :**
+```powershell
+# Via commande secedit
+@"
+[System Access]
+PasswordComplexity = 1
+"@ | Out-File C:\secpol_fix.inf
+
+secedit /configure /db C:\Windows\security\local.sdb /cfg C:\secpol_fix.inf /areas SECURITYPOLICY
+```
+
+### ✅ Check #2 : Compte Administrator Intégré
+
+#### Commande : Vérifier le statut du compte Administrator
+
+```powershell
+Get-LocalUser -Name "Administrator" | Select-Object Name, Enabled, Description, PasswordLastSet, PasswordExpires
+```
+
+**📖 Explication :**
+- `Get-LocalUser` = récupère les infos d'un compte local
+- `-Name "Administrator"` = le compte Administrator intégré de Windows
+- `Select-Object ...` = affiche les colonnes qui nous intéressent
+
+**💻 Exemple de résultat - CAS 1 (ACCEPTABLE) :**
+
+```
+Name          Enabled Description                      PasswordLastSet      PasswordExpires
+----          ------- -----------                      ---------------      ---------------
+Administrator   False Built-in account for admin...   1/15/2025 10:00:00 AM
+```
+
+**✅ Analyse :**
+- `Enabled: False` = Le compte est **désactivé** = ✅ BON
+- Un compte désactivé ne peut pas se connecter = sécurité !
+
+**💻 Exemple de résultat - CAS 2 (PAS TERRIBLE mais courant) :**
+
+```
+Name          Enabled Description                      PasswordLastSet      PasswordExpires
+----          ------- -----------                      ---------------      ---------------
+Administrator    True Built-in account for admin...   1/15/2025 10:00:00 AM  4/15/2025
+```
+
+**⚠️ Analyse :**
+- `Enabled: True` = Le compte est **actif**
+- Problème : Le nom "Administrator" est connu de tous les hackers
+- Ils vont essayer de deviner le mot de passe (force brute)
+
+**🎯 Meilleures pratiques CIS Benchmark :**
+
+**Option A (Recommandée) :** Renommer + Désactiver
+```powershell
+# 1. Renomme le compte Administrator
+Rename-LocalUser -Name "Administrator" -NewName "SysAdmin_Hidden_2025"
+
+# 2. Désactive-le
+Disable-LocalUser -Name "SysAdmin_Hidden_2025"
+
+# 3. Vérifie
+Get-LocalUser -Name "SysAdmin_Hidden_2025"
+```
+
+**Option B (Si tu DOIS le garder actif) :** Renommer seulement
+```powershell
+# Renomme avec un nom non-évident
+Rename-LocalUser -Name "Administrator" -NewName "SrvAdmin_DC01"
+
+# Change la description pour ne pas indiquer que c'est l'admin
+Set-LocalUser -Name "SrvAdmin_DC01" -Description "Service Account"
+```
+
+**💡 Astuce pro :** Crée un compte "leurre" nommé "Administrator" sans privilèges :
+```powershell
+# Crée un faux compte Administrator (honeypot)
+New-LocalUser -Name "Administrator_Decoy" -Description "Honeypot" -NoPassword
+# Si quelqu'un essaie ce compte, tu sauras que c'est une tentative d'intrusion !
+```
+
+### ✅ Check #3 : Compte Guest
+
+#### Commande : Vérifier le compte Guest
+
+```powershell
+Get-LocalUser -Name "Guest" | Select-Object Name, Enabled
+```
+
+**💻 Résultat ATTENDU :**
+```
+Name  Enabled
+----  -------
+Guest   False
+```
+
+**✅ `Enabled: False`** = PARFAIT ! Le compte Guest est désactivé.
+
+**❌ Si `Enabled: True`** :
+```powershell
+# Désactive le compte Guest
+Disable-LocalUser -Name "Guest"
+```
+
+**🎓 Pourquoi désactiver Guest ?**
+- Même avec privilèges limités, il peut servir de point d'entrée
+- Un attaquant peut l'utiliser pour la reconnaissance (énumérer les fichiers, les services, etc.)
+- Principe de sécurité : **Moins de comptes = Moins de risques**
+
+### ✅ Check #4 : Comptes Administrateurs
+
+#### Commande : Lister TOUS les administrateurs
+
+```powershell
+Get-LocalGroupMember -Group "Administrators"
+```
+
+**📖 Explication :**
+- `Get-LocalGroupMember` = liste les membres d'un groupe local
+- `-Group "Administrators"` = le groupe des administrateurs locaux
+
+**💻 Exemple de résultat - BIEN :**
+
+```
+ObjectClass Name                       PrincipalSource
+----------- ----                       ---------------
+User        SERVER2022\SysAdmin_Hidden Local
+User        SERVER2022\JohnDoe_Admin   Local
+Group       DOMAIN\Domain Admins       ActiveDirectory
+```
+
+**✅ Analyse :**
+- **2-3 comptes** administrateurs locaux = Nombre raisonnable
+- Nom renommé (SysAdmin_Hidden) = Bon
+- Domain Admins présent = Normal sur un serveur membre du domaine
+
+**💻 Exemple de résultat - PROBLÈME :**
+
+```
+ObjectClass Name                       PrincipalSource
+----------- ----                       ---------------
+User        SERVER2022\Administrator   Local
+User        SERVER2022\admin           Local
+User        SERVER2022\root            Local
+User        SERVER2022\test            Local
+User        SERVER2022\backup          Local
+User        SERVER2022\JohnDoe         Local
+User        SERVER2022\SQLService      Local
+Group       DOMAIN\Domain Admins       ActiveDirectory
+```
+
+**🚨 Problèmes identifiés :**
+
+| Compte | Problème | Risque |
+|--------|----------|--------|
+| `Administrator` | Nom par défaut pas renommé | 🔴 Cible facile |
+| `admin`, `root` | Noms évidents | 🔴 Première tentative des hackers |
+| `test` | Compte de test oublié ? | 🟠 Probablement inutilisé |
+| `backup` | Compte de service ? | 🔴 Mot de passe jamais changé ? |
+| `JohnDoe` | Compte utilisateur normal avec droits admin | 🟠 Violation principe moindre privilège |
+| `SQLService` | Compte de service SQL | 🔴 CRITIQUE si admin du domaine |
+
+**🔧 Actions à prendre :**
+
+```powershell
+# 1. Inventorier et documenter chaque compte admin
+Get-LocalGroupMember -Group "Administrators" | ForEach-Object {
+    $user = $_.Name.Split('\')[1]
+    try {
+        $lastLogon = (Get-LocalUser -Name $user -ErrorAction Stop).LastLogon
+        [PSCustomObject]@{
+            Name = $_.Name
+            LastLogon = $lastLogon
+            DaysSinceLogon = if($lastLogon){(New-TimeSpan -Start $lastLogon -End (Get-Date)).Days}else{"Never"}
+        }
+    } catch {
+        [PSCustomObject]@{
+            Name = $_.Name
+            LastLogon = "N/A (Domain/Group)"
+            DaysSinceLogon = "N/A"
+        }
+    }
+}
+```
+
+**💻 Résultat :**
+```
+Name                       LastLogon              DaysSinceLogon
+----                       ---------              --------------
+SERVER2022\Administrator   1/10/2025 10:00:00 AM  5
+SERVER2022\test            12/1/2024 3:00:00 PM   45
+SERVER2022\backup                                 Never
+```
+
+**✅ Compte utilisé récemment** (< 30 jours) = OK à garder
+**⚠️ Compte non utilisé depuis 30-90 jours** = À investiguer
+**❌ Compte jamais utilisé ou > 90 jours** = **À SUPPRIMER**
+
+```powershell
+# 2. Supprimer les comptes inutilisés
+Remove-LocalUser -Name "test"
+Remove-LocalGroupMember -Group "Administrators" -Member "backup"
+
+# 3. Créer des comptes admin dédiés (principe: 1 personne = 1 compte admin dédié)
+# Exemple: John Doe a son compte "jdoe" normal + "jdoe-admin" pour admin
+New-LocalUser -Name "jdoe-admin" -Description "Admin account for John Doe" -PasswordNeverExpires:$false
+Add-LocalGroupMember -Group "Administrators" -Member "jdoe-admin"
+```
+
+### 📊 Récapitulatif Partie 2
+
+**✅ Checklist - Comptes Utilisateurs :**
+- [ ] Politique de mot de passe : ≥ 14 caractères, complexité activée
+- [ ] Expiration : ≤ 365 jours
+- [ ] Historique : ≥ 24 mots de passe
+- [ ] Verrouillage : 5 tentatives, 15 minutes
+- [ ] Compte Administrator renommé ou désactivé
+- [ ] Compte Guest désactivé
+- [ ] Nombre d'administrateurs ≤ 5
+- [ ] Tous les comptes admin documentés et justifiés
+- [ ] Comptes inactifs > 90 jours supprimés
+- [ ] Pas de comptes de service dans Administrators
+
+**🎓 Ce que tu maîtrises maintenant :**
+- ✅ Auditer la politique de mots de passe
+- ✅ Calculer la sécurité d'un mot de passe (longueur vs temps de crack)
+- ✅ Sécuriser le compte Administrator
+- ✅ Identifier les comptes à risque
+- ✅ Appliquer le principe du moindre privilège
+- ✅ Nettoyer les comptes dormants
+
+**Niveau actuel : 🌟🌟 Intermédiaire → Intermédiaire+ !**
+
+---
+
+## 🖥️ PARTIE 3 : Bureau à Distance (RDP) - Sécuriser la Porte d'Entrée
+
+### 🎓 Concept : RDP = La porte principale de ton serveur
+
+**Analogie :** RDP (Remote Desktop Protocol), c'est comme la porte d'entrée principale de ton immeuble :
+- **Bien sécurisée** = Digicode, interphone, caméra, gardien
+- **Mal sécurisée** = Porte ouverte avec un panneau "Entrez librement !"
+
+**Statistiques alarmantes :**
+- **RDP est la cible #1 des ransomwares** (90% des attaques l'utilisent)
+- Un serveur Windows avec RDP exposé sur Internet reçoit **~10 000 tentatives d'attaque par jour**
+- En moyenne, un serveur RDP mal configuré est compromis en **moins de 24 heures**
+
+**Exemples réels :**
+- **Colonial Pipeline (2021)** : Ransomware via RDP non protégé par MFA
+- **Kaseya (2021)** : RDP compromis → REvil ransomware → 1 500 entreprises impactées
+- **Banques russes (2023)** : 25 millions $ volés via brute-force RDP
+
+### ✅ Check #1 : RDP est-il activé ?
+
+#### Commande : Vérifier le statut RDP
+
+```powershell
+Get-ItemProperty -Path "HKLM:\System\CurrentControlSet\Control\Terminal Server" -Name "fDenyTSConnections"
+```
+
+**📖 Explication :**
+- `Get-ItemProperty` = lit une clé du registre Windows
+- `fDenyTSConnections` = **f**lag **Deny** **T**erminal **S**ervices **Connections**
+  - `0` = RDP est **AUTORISÉ** (activé)
+  - `1` = RDP est **REFUSÉ** (désactivé)
+
+**💻 Exemple de résultat - CAS 1 (RDP DÉSACTIVÉ - IDÉAL si non utilisé) :**
+
+```
+fDenyTSConnections : 1
+```
+
+**✅ Analyse :**
+- `1` = RDP est **désactivé**
+- Si tu n'utilises pas RDP = **C'est PARFAIT !**
+- Principe de sécurité : Ce qui n'est pas actif ne peut pas être attaqué
+
+**💻 Exemple de résultat - CAS 2 (RDP ACTIVÉ - À sécuriser) :**
+
+```
+fDenyTSConnections : 0
+```
+
+**⚠️ Analyse :**
+- `0` = RDP est **actif**
+- Ce n'est pas mauvais EN SOI, mais il FAUT le sécuriser correctement !
+- Continue les checks suivants pour sécuriser RDP
+
+**🔧 Si RDP n'est PAS nécessaire, désactive-le :**
+
+```powershell
+# Désactive RDP
+Set-ItemProperty -Path "HKLM:\System\CurrentControlSet\Control\Terminal Server" -Name "fDenyTSConnections" -Value 1
+
+# Désactive aussi la règle du pare-feu
+Disable-NetFirewallRule -DisplayGroup "Remote Desktop"
+
+# Vérifie
+Get-ItemProperty -Path "HKLM:\System\CurrentControlSet\Control\Terminal Server" -Name "fDenyTSConnections"
+```
+
+**💡 Question importante :** "Mais si je désactive RDP, comment je me connecte à mon serveur ?"
+
+**Réponses :**
+1. **En local** (console directe, KVM)
+2. **Via PowerShell Remoting** (WinRM) - plus sécurisé que RDP
+3. **Via un bastion/jump server** avec RDP activé uniquement là
+4. **Via VPN** puis RDP (ajoute une couche de sécurité)
+
+### ✅ Check #2 : Network Level Authentication (NLA)
+
+**C'est quoi NLA ?** = Authentification AVANT d'établir la session RDP
+
+**Sans NLA :**
+1. Attaquant se connecte à RDP
+2. Voit l'écran de login Windows
+3. Essaie 10 000 mots de passe
+4. Peut exploiter des vulnérabilités de la stack RDP
+
+**Avec NLA :**
+1. Attaquant doit s'authentifier AVANT même de voir l'écran
+2. Impossible d'exploiter les vulnérabilités de l'écran de login
+3. Protection contre BlueKeep (CVE-2019-0708) et autres CVE RDP
+
+#### Commande : Vérifier si NLA est actif
+
+```powershell
+Get-ItemProperty -Path "HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp" -Name "UserAuthentication"
+```
+
+**💻 Résultat ATTENDU :**
+```
+UserAuthentication : 1
+```
+
+**✅ `1` = NLA est **ACTIVÉ** = PARFAIT**
+
+**❌ `0` = NLA est **DÉSACTIVÉ** = DANGER**
+
+**🔧 Active NLA si désactivé :**
+
+```powershell
+Set-ItemProperty -Path "HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp" -Name "UserAuthentication" -Value 1
+
+# Redémarre le service RDP pour appliquer
+Restart-Service -Name TermService -Force
+```
+
+### ✅ Check #3 : Niveau de Chiffrement RDP
+
+#### Commande : Vérifier le niveau de chiffrement
+
+```powershell
+Get-ItemProperty -Path "HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp" -Name "MinEncryptionLevel"
+```
+
+**💻 Résultat ATTENDU :**
+```
+MinEncryptionLevel : 3
+```
+
+**🔍 Valeurs possibles :**
+
+| Valeur | Niveau | Chiffrement | Sécurité |
+|--------|--------|-------------|----------|
+| 1 | Low | 56-bit | ❌ OBSOLÈTE (crackable) |
+| 2 | Client Compatible | Négocié | 🟡 Selon client |
+| **3** | **High** | **128-bit (AES)** | ✅ **RECOMMANDÉ** |
+| 4 | FIPS Compliant | FIPS 140-2 | ✅ Requis pour gouvernement US |
+
+**🔧 Force le chiffrement maximum :**
+
+```powershell
+# Niveau 3 = High (128-bit)
+Set-ItemProperty -Path "HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp" -Name "MinEncryptionLevel" -Value 3
+
+# Niveau 4 = FIPS (si requis par compliance)
+# Set-ItemProperty -Path "HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp" -Name "MinEncryptionLevel" -Value 4
+```
+
+### ✅ Check #4 : Couche de Sécurité (TLS vs RDP)
+
+#### Commande : Vérifier la couche de sécurité
+
+```powershell
+Get-ItemProperty -Path "HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp" -Name "SecurityLayer"
+```
+
+**💻 Résultat ATTENDU :**
+```
+SecurityLayer : 2
+```
+
+**🔍 Valeurs possibles :**
+
+| Valeur | Protocole | Sécurité |
+|--------|-----------|----------|
+| 0 | RDP natif | ❌ OBSOLÈTE (vulnérabilités connues) |
+| 1 | Negotiate | 🟡 Dépend du client |
+| **2** | **SSL/TLS** | ✅ **RECOMMANDÉ** (HTTPS-like) |
+
+**🔧 Force SSL/TLS :**
+
+```powershell
+Set-ItemProperty -Path "HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp" -Name "SecurityLayer" -Value 2
+```
+
+### ✅ Check #5 : Port RDP
+
+#### Commande : Voir le port RDP
+
+```powershell
+Get-ItemProperty -Path "HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp" -Name "PortNumber"
+```
+
+**💻 Résultat par défaut :**
+```
+PortNumber : 3389
+```
+
+**🎯 Port 3389 = Port RDP par défaut**
+
+**Problème :** TOUS les hackers scannent le port 3389 sur Internet
+- Scans automatisés 24/7
+- Attaques ciblées sur 3389
+
+**💡 Option (débattue) : Changer le port**
+
+**Pour :**
+- Réduit le bruit (scans automatisés)
+- "Security through obscurity" partielle
+
+**Contre :**
+- Ne protège PAS contre un attaquant déterminé
+- Peut compliquer la maintenance
+
+**🔧 Si tu décides de changer le port :**
+
+```powershell
+# Change le port RDP (exemple: 13389)
+Set-ItemProperty -Path "HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp" -Name "PortNumber" -Value 13389
+
+# Ajoute une règle de pare-feu pour le nouveau port
+New-NetFirewallRule -DisplayName "RDP Custom Port" -Direction Inbound -LocalPort 13389 -Protocol TCP -Action Allow
+
+# Désactive l'ancienne règle sur le port 3389
+Disable-NetFirewallRule -DisplayGroup "Remote Desktop"
+
+# Redémarre le service
+Restart-Service -Name TermService -Force
+```
+
+**⚠️ IMPORTANT après changement de port :**
+Pour te connecter, utilise :
+```
+mstsc /v:server_ip:13389
+```
+
+### ✅ Check #6 : Règles Pare-feu RDP
+
+#### Commande : Voir les règles RDP du pare-feu
+
+```powershell
+Get-NetFirewallRule -DisplayName "*Remote Desktop*" | Select-Object DisplayName, Enabled, Direction, Action
+```
+
+**💻 Exemple de résultat :**
+
+```
+DisplayName                                      Enabled Direction Action
+-----------                                      ------- --------- ------
+Remote Desktop - User Mode (TCP-In)                True Inbound   Allow
+Remote Desktop - User Mode (UDP-In)                True Inbound   Allow
+Remote Desktop - Shadow (TCP-In)                  False Inbound   Allow
+```
+
+**✅ Ce qui est BON :**
+- Règles RDP activées SEULEMENT si tu utilises RDP
+- Direction `Inbound` (entrant)
+- Action `Allow`
+
+**⚠️ MAIS il manque une chose CRITIQUE : La restriction par IP !**
+
+#### Commande : Vérifier si les règles sont restreintes par IP
+
+```powershell
+Get-NetFirewallRule -DisplayName "*Remote Desktop*" | Get-NetFirewallAddressFilter
+```
+
+**💻 Exemple DANGEREUX :**
+
+```
+LocalAddress  : Any
+RemoteAddress : Any
+```
+
+**🚨 PROBLÈME :**
+- `RemoteAddress: Any` = N'importe qui sur Internet peut essayer de se connecter !
+- Exposition maximale aux attaques
+
+**🔧 SOLUTION : Restreindre RDP aux IPs autorisées**
+
+```powershell
+# Supprime les règles RDP par défaut
+Remove-NetFirewallRule -DisplayGroup "Remote Desktop"
+
+# Crée une nouvelle règle RESTREINTE à ton IP
+New-NetFirewallRule -DisplayName "RDP - IP Restreinte Admin" `
+    -Direction Inbound `
+    -LocalPort 3389 `
+    -Protocol TCP `
+    -Action Allow `
+    -RemoteAddress "192.168.1.100/32"  # TON IP !
+
+# Ou pour un réseau entier (VPN par exemple)
+New-NetFirewallRule -DisplayName "RDP - Réseau VPN" `
+    -Direction Inbound `
+    -LocalPort 3389 `
+    -Protocol TCP `
+    -Action Allow `
+    -RemoteAddress "10.0.1.0/24"  # Ton réseau VPN
+```
+
+**💡 Si tu as plusieurs IPs autorisées :**
+
+```powershell
+New-NetFirewallRule -DisplayName "RDP - IPs Autorisées" `
+    -Direction Inbound `
+    -LocalPort 3389 `
+    -Protocol TCP `
+    -Action Allow `
+    -RemoteAddress @("192.168.1.100","192.168.1.101","10.5.1.50")
+```
+
+### 🔧 Configuration RDP COMPLÈTE ET SÉCURISÉE
+
+Voici un script complet pour sécuriser RDP comme un pro :
+
+```powershell
+# ============================================
+# SCRIPT DE SÉCURISATION RDP COMPLET
+# ============================================
+
+Write-Host "=== SÉCURISATION RDP ===" -ForegroundColor Cyan
+
+# 1. Active NLA (Network Level Authentication)
+Write-Host "[1/6] Activation NLA..." -ForegroundColor Yellow
+Set-ItemProperty -Path "HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp" `
+    -Name "UserAuthentication" -Value 1
+
+# 2. Force SSL/TLS
+Write-Host "[2/6] Force SSL/TLS..." -ForegroundColor Yellow
+Set-ItemProperty -Path "HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp" `
+    -Name "SecurityLayer" -Value 2
+
+# 3. Force chiffrement maximum (128-bit)
+Write-Host "[3/6] Force chiffrement High..." -ForegroundColor Yellow
+Set-ItemProperty -Path "HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp" `
+    -Name "MinEncryptionLevel" -Value 3
+
+# 4. Configure le timeout d'inactivité (15 minutes)
+Write-Host "[4/6] Configure timeout inactivité..." -ForegroundColor Yellow
+Set-ItemProperty -Path "HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp" `
+    -Name "MaxIdleTime" -Value 900000  # 15 minutes en millisecondes
+
+# 5. Désactive les anciennes règles de pare-feu
+Write-Host "[5/6] Nettoyage pare-feu..." -ForegroundColor Yellow
+Remove-NetFirewallRule -DisplayGroup "Remote Desktop" -ErrorAction SilentlyContinue
+
+# 6. Crée une règle restreinte par IP
+Write-Host "[6/6] Création règle pare-feu restreinte..." -ForegroundColor Yellow
+$AdminIP = Read-Host "Entre l'IP autorisée pour RDP (ex: 192.168.1.100)"
+New-NetFirewallRule -DisplayName "RDP - IP Admin Autorisée" `
+    -Direction Inbound `
+    -LocalPort 3389 `
+    -Protocol TCP `
+    -Action Allow `
+    -RemoteAddress $AdminIP `
+    -Profile Any
+
+# Redémarre le service RDP
+Write-Host "Redémarrage service RDP..." -ForegroundColor Yellow
+Restart-Service -Name TermService -Force
+
+Write-Host "`n=== RDP SÉCURISÉ ! ===" -ForegroundColor Green
+Write-Host "NLA: Activé" -ForegroundColor Green
+Write-Host "SSL/TLS: Forcé" -ForegroundColor Green
+Write-Host "Chiffrement: 128-bit" -ForegroundColor Green
+Write-Host "Pare-feu: Restreint à $AdminIP" -ForegroundColor Green
+```
+
+### 📊 Récapitulatif Partie 3
+
+**✅ Checklist - RDP Sécurisé :**
+- [ ] RDP désactivé si non utilisé (`fDenyTSConnections = 1`)
+- [ ] Si RDP actif :
+  - [ ] NLA activé (`UserAuthentication = 1`)
+  - [ ] SSL/TLS forcé (`SecurityLayer = 2`)
+  - [ ] Chiffrement High (`MinEncryptionLevel = 3`)
+  - [ ] Port changé (optionnel mais recommandé)
+  - [ ] Pare-feu restreint par IP source (CRITIQUE)
+  - [ ] Timeout d'inactivité configuré
+- [ ] Testé la connexion RDP depuis IP autorisée
+- [ ] Vérifié que connexion est refusée depuis autres IPs
+
+**🎓 Ce que tu maîtrises maintenant :**
+- ✅ Comprendre les risques RDP (pourquoi c'est LA cible #1)
+- ✅ Activer Network Level Authentication (NLA)
+- ✅ Configurer le chiffrement RDP
+- ✅ Forcer SSL/TLS pour RDP
+- ✅ Restreindre RDP par adresse IP (CRUCIAL)
+- ✅ Changer le port RDP (optionnel)
+- ✅ Appliquer une configuration RDP sécurisée complète
+
+**Niveau actuel : 🌟🌟🌟 Intermédiaire+ → Avancé !**
+
+---
+
+*[Guide Windows Server 2022 - Parties 4-10 à venir]*
+
+**Parties suivantes :**
 - Partie 4 : Pare-feu Windows Defender
 - Partie 5 : Windows Defender et Antivirus
 - Partie 6 : Audit et Journalisation
@@ -449,4 +1200,4 @@ Restart-Computer -Force
 
 ---
 
-*Ce guide est en cours de transformation pour le rendre ultra-accessible et pédagogique. La suite arrive bientôt !*
+*Transformation en cours... La suite arrive bientôt !*

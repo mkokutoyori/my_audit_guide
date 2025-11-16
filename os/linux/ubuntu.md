@@ -1,969 +1,804 @@
-# Guide d'Audit Technique - Ubuntu Server
+# 🐧 Tutoriel d'Audit - Ubuntu Server
 
-## 📋 Vue d'ensemble
+Salut ! Alors comme ça, tu veux auditer un serveur Ubuntu ? Super choix ! Ubuntu, c'est un peu le couteau suisse des serveurs Linux - populaire, bien documenté, et parfait pour apprendre.
 
-Ce guide vous permet d'effectuer un audit de sécurité complet d'un serveur Ubuntu. Il est basé sur les standards suivants :
-- **CIS Benchmark for Ubuntu Linux** (dernière version)
-- **ANSSI-BP-028** - Configuration recommendations for GNU/Linux systems
-- **NIST National Checklist Program**
+Dans ce tutoriel, on va jouer au détective et vérifier ensemble que ton serveur est bien sécurisé. Promis, je vais tout t'expliquer comme si on prenait un café ensemble !
 
-### Version du guide
-- **Dernière mise à jour** : Janvier 2025
-- **Systèmes couverts** : Ubuntu 20.04 LTS, 22.04 LTS, 24.04 LTS
-- **Type d'audit** : Sécurité et conformité
+## 🎯 Ce qu'on va faire ensemble
 
----
+On va vérifier que ton serveur Ubuntu est bien protégé, un peu comme si tu faisais le tour de ta maison pour vérifier que toutes les portes et fenêtres sont bien fermées.
 
-## 🎯 Objectifs de l'audit
+**Concrètement, on va checker :**
+- 🔒 Les mots de passe et comptes utilisateurs (qui a les clés ?)
+- 🚪 Les accès SSH (la porte d'entrée principale)
+- 🔥 Le pare-feu (le videur à l'entrée)
+- 📝 Les logs (la vidéosurveillance)
+- 🛠️ Les services qui tournent (les appareils allumés dans ta maison)
+- 🔐 Les fichiers sensibles (le coffre-fort)
 
-- Évaluer la posture de sécurité du serveur Ubuntu
-- Identifier les configurations non conformes aux bonnes pratiques
-- Détecter les vulnérabilités potentielles
-- Vérifier la conformité aux standards de sécurité
-- Produire un rapport d'audit actionnable
+## 📋 Avant de Commencer
 
----
+### Ce dont tu as besoin
 
-## 📚 Prérequis
+**Niveau requis :**
+Si tu sais :
+- Te connecter en SSH à un serveur
+- Taper des commandes dans un terminal
+- Copier-coller (compétence pro !)
 
-### Connaissances requises
-- Commandes Linux de base (ls, cat, grep, etc.)
-- Compréhension des permissions Unix
-- Notions de base en sécurité informatique
+Alors tu es prêt·e ! 🎉
 
-### Accès nécessaire
-- Accès SSH au serveur
-- Privilèges sudo/root
-- Possibilité de lecture des fichiers de configuration
+**Accès nécessaire :**
+- Une connexion SSH au serveur Ubuntu
+- Un compte avec les droits `sudo` (l'équivalent admin)
+- 30-45 minutes devant toi
 
-### Outils recommandés
+**Versions couvertes :**
+- Ubuntu 20.04 LTS (le robuste)
+- Ubuntu 22.04 LTS (le moderne)
+- Ubuntu 24.04 LTS (le tout nouveau)
+
+### Installer les outils d'audit
+
+On va installer quelques outils sympas pour nous aider. Connecte-toi en SSH et tape :
+
 ```bash
-# Installation des outils d'audit
+# Mise à jour de la liste des paquets
 sudo apt update
+
+# Installation des outils d'audit
 sudo apt install -y lynis aide rkhunter chkrootkit ufw auditd fail2ban
+
+# Vérifie que tout s'est bien passé
+echo "C'est bon, on est prêts !"
 ```
 
+> **💡 Astuce :** Copie-colle ces commandes une par une. Si tu vois des erreurs en rouge, pas de panique ! Lis le message, souvent il te dit exactement quoi faire.
+
 ---
 
-## 🔍 Points de Contrôle d'Audit
+## 🔍 Partie 1 : Les Mises à Jour (Super Important !)
 
-### 1. GESTION DES MISES À JOUR
+### 💬 Qu'est-ce qu'on cherche ?
 
-#### 1.1 Vérification des mises à jour de sécurité
+On veut vérifier que ton serveur n'est pas en retard sur ses mises à jour de sécurité. C'est comme vérifier que ton antivirus est à jour !
 
-**Objectif :** S'assurer que toutes les mises à jour de sécurité sont installées
+### 🤔 Pourquoi c'est crucial ?
 
-**Justification :** Les mises à jour de sécurité corrigent des vulnérabilités connues et documentées (CVE). Un système non mis à jour est exposé à des exploits publics.
+Imagine : un hacker découvre une faille sur Ubuntu. Ubuntu sort un patch (un correctif). Si tu ne l'installes pas, c'est comme si tu laissais une fenêtre cassée non réparée alors que tout le quartier sait qu'elle est cassée !
 
-**Procédure :**
+Les attaques les plus connues (WannaCry, NotPetya...) ont exploité des failles qui avaient des patchs disponibles depuis des mois. Les victimes ? Ceux qui n'avaient pas fait leurs mises à jour. 😬
+
+### ⚙️ Comment vérifier
+
 ```bash
-# Vérifier les mises à jour disponibles
+# Voir quelles mises à jour sont disponibles
 sudo apt update
 sudo apt list --upgradable
 
-# Vérifier spécifiquement les mises à jour de sécurité
+# Vérifier les mises à jour de sécurité spécifiquement
 sudo unattended-upgrades --dry-run -d
 
-# Vérifier la configuration des mises à jour automatiques
-cat /etc/apt/apt.conf.d/50unattended-upgrades
+# Voir si les mises à jour auto sont activées
 systemctl status unattended-upgrades
 ```
 
-**Résultats attendus :**
-- ✅ Aucune mise à jour de sécurité en attente
-- ✅ Service `unattended-upgrades` actif et configuré
-- ✅ Mises à jour automatiques activées pour les paquets de sécurité
+### ✅ Ce que tu VEUX voir
 
-**Risques identifiés :**
-| Configuration | Criticité | Risque |
-|---------------|-----------|---------|
-| Mises à jour manquantes > 30 jours | 🔴 CRITIQUE | Exploitation de vulnérabilités connues (CVE) |
-| Mises à jour manquantes < 30 jours | 🟠 ÉLEVÉ | Fenêtre d'exposition aux attaques |
-| Pas de mise à jour automatique | 🟡 MOYEN | Oubli de patches critiques |
+**Scénario idéal :**
+```
+0 upgraded, 0 newly installed, 0 to remove
+```
+Ou au pire, des mises à jour non-critiques.
 
-**Recommandations :**
+**Service des mises à jour automatiques :**
+```
+● unattended-upgrades.service - Unattended Upgrades Shutdown
+   Active: active (running)
+```
+
+### ❌ Signaux d'alarme
+
+**🔴 ALERTE ROUGE** si tu vois :
+```
+Les mises à jour suivantes de sécurité sont disponibles :
+linux-generic (security update)
+openssl (security update)
+```
+
+Surtout si elles datent de plus de 30 jours ! C'est comme laisser ta porte d'entrée cassée pendant un mois.
+
+**🟠 ATTENTION** si :
+- Le service `unattended-upgrades` est inactif
+- Des mises à jour normales traînent depuis >90 jours
+
+### 🔧 Comment réparer
+
+**Installer les mises à jour NOW :**
 ```bash
-# Activer les mises à jour automatiques de sécurité
+# Installe tout ce qui est en retard
+sudo apt update && sudo apt upgrade -y
+
+# Redémarre si nécessaire (surtout si kernel mis à jour)
+sudo reboot
+```
+
+**Activer les mises à jour automatiques :**
+```bash
+# Active le service
 sudo dpkg-reconfigure -plow unattended-upgrades
 
-# Configuration recommandée dans /etc/apt/apt.conf.d/50unattended-upgrades
-Unattended-Upgrade::Allowed-Origins {
-    "${distro_id}:${distro_codename}-security";
-};
-Unattended-Upgrade::Automatic-Reboot "false";
-Unattended-Upgrade::AutoFixInterruptedDpkg "true";
+# Vérifie que c'est bien activé
+cat /etc/apt/apt.conf.d/20auto-upgrades
 ```
+
+Tu devrais voir :
+```
+APT::Periodic::Update-Package-Lists "1";
+APT::Periodic::Unattended-Upgrade "1";
+```
+
+> **💡 Le conseil du chef :** Active TOUJOURS les mises à jour auto de sécurité. Pour les autres mises à jour, tu peux choisir de le faire manuellement si tu veux garder le contrôle.
 
 ---
 
-### 2. CONFIGURATION DU COMPTE ROOT ET UTILISATEURS
+## 🔐 Partie 2 : Les Comptes Utilisateurs
 
-#### 2.1 Désactivation du login root direct
+### 💬 Qu'est-ce qu'on cherche ?
 
-**Objectif :** Vérifier que la connexion directe en tant que root est désactivée
+On va faire l'inventaire de qui a accès à ton serveur et avec quels pouvoirs. C'est comme vérifier qui a les clés de ta maison !
 
-**Justification :** La connexion directe root augmente les risques d'attaques par force brute et rend l'audit des actions difficile. L'utilisation de sudo permet une traçabilité des actions.
+### 🤔 Pourquoi c'est important ?
 
-**Procédure :**
+**Analogie du quotidien :**
+Tu ne laisserais pas la clé de ta maison sous le paillasson, ni ne donnerais un double à quelqu'un que tu ne connais plus, non ? Pareil pour ton serveur !
+
+Les comptes mal gérés, c'est la porte d'entrée #1 des hackers :
+- Comptes avec mot de passe faible → Force brute
+- Comptes anonymes → Accès gratuit
+- Comptes sans mot de passe → Open bar !
+
+### 🔍 Check #1 : Le compte root
+
+**C'est quoi root ?**
+`root` c'est le super-admin absolu du serveur. Il peut TOUT faire, même détruire le serveur en une commande. C'est pour ça qu'on ne veut PAS se connecter directement avec ce compte !
+
+**Vérifie ça :**
 ```bash
-# Vérifier la configuration SSH pour root
-grep "^PermitRootLogin" /etc/ssh/sshd_config
+# Regarde si root peut se connecter en SSH
+sudo grep "PermitRootLogin" /etc/ssh/sshd_config
 
-# Vérifier si le compte root a un mot de passe
+# Regarde si root a un mot de passe
 sudo passwd -S root
-
-# Vérifier les dernières connexions root
-sudo lastb | grep root
-sudo last | grep root
 ```
 
-**Résultats attendus :**
-- ✅ `PermitRootLogin no` ou `PermitRootLogin prohibit-password`
-- ✅ Compte root verrouillé (status L) ou sans mot de passe
-- ✅ Aucune connexion root directe dans les logs
+**✅ Bon résultat :**
+```
+PermitRootLogin no
+# OU
+PermitRootLogin prohibit-password
 
-**Risques identifiés :**
-| Configuration | Criticité | Risque |
-|---------------|-----------|---------|
-| PermitRootLogin yes | 🔴 CRITIQUE | Attaques par force brute sur root, pas de traçabilité |
-| Root avec mot de passe simple | 🔴 CRITIQUE | Compromission facile du compte privilégié |
-| Connexions root récentes | 🟠 ÉLEVÉ | Pratiques administratives dangereuses |
+root L ...  # Le 'L' = compte verrouillé, c'est bon !
+```
 
-**Recommandations :**
+**❌ Mauvais résultat :**
+```
+PermitRootLogin yes  # ← NOPE ! Danger !
+
+root P ...  # Le 'P' = mot de passe actif, pas top
+```
+
+**🔧 Comment corriger :**
 ```bash
-# Désactiver le login root SSH
+# Désactiver le login root en SSH
 sudo sed -i 's/^#\?PermitRootLogin.*/PermitRootLogin no/' /etc/ssh/sshd_config
+
+# Redémarrer SSH pour appliquer
 sudo systemctl restart sshd
 
-# Verrouiller le compte root
+# Verrouiller le compte root pour plus de sécurité
 sudo passwd -l root
 ```
 
-#### 2.2 Politique de mots de passe
+> **⚠️ ATTENTION :** Assure-toi d'avoir un autre compte avec `sudo` avant de bloquer root ! Sinon tu te retrouves enfermé dehors !
 
-**Objectif :** Vérifier la robustesse de la politique de mots de passe
+### 🔍 Check #2 : Les comptes sans mot de passe (oui, ça existe !)
 
-**Justification :** Des mots de passe faibles sont la première cause de compromission de comptes. Une politique stricte réduit drastiquement ce risque.
-
-**Procédure :**
+**Vérifie :**
 ```bash
-# Vérifier la configuration PAM pour les mots de passe
-cat /etc/pam.d/common-password
-
-# Vérifier la configuration de la complexité
-cat /etc/security/pwquality.conf
-
-# Vérifier les paramètres d'expiration
-cat /etc/login.defs | grep -E "PASS_MAX_DAYS|PASS_MIN_DAYS|PASS_MIN_LEN|PASS_WARN_AGE"
-
-# Auditer les comptes utilisateurs
-sudo awk -F: '($3 >= 1000) {print $1}' /etc/passwd | while read user; do
-    sudo chage -l "$user"
-done
+# Cherche les comptes sans mot de passe
+sudo awk -F: '($2 == "" ) {print "ALERTE: " $1 " n'\''a PAS de mot de passe !"}' /etc/shadow
 ```
 
-**Résultats attendus :**
-- ✅ Longueur minimale : 14 caractères (ANSSI niveau intermédiaire) ou 12 (CIS)
-- ✅ Complexité activée (minlen, dcredit, ucredit, lcredit, ocredit)
-- ✅ Expiration max : 90 jours (CIS) ou 365 jours (ANSSI niveau minimal)
-- ✅ Délai minimum entre changements : 1 jour
-- ✅ Avertissement : 7 jours avant expiration
+**✅ Bon résultat :**
+Rien qui s'affiche ! Silence radio = tout va bien.
 
-**Risques identifiés :**
-| Configuration | Criticité | Risque |
-|---------------|-----------|---------|
-| Pas de politique de complexité | 🔴 CRITIQUE | Mots de passe faibles, attaques par dictionnaire |
-| Longueur < 8 caractères | 🔴 CRITIQUE | Force brute rapide |
-| Pas d'expiration | 🟠 ÉLEVÉ | Mots de passe compromis restent valides indéfiniment |
-| Expiration > 365 jours | 🟡 MOYEN | Fenêtre d'exploitation longue |
+**❌ Mauvais résultat :**
+```
+ALERTE: testuser n'a PAS de mot de passe !
+```
 
-**Recommandations :**
+**🔧 Comment corriger :**
 ```bash
-# Configuration recommandée dans /etc/security/pwquality.conf
+# Ajoute un mot de passe au compte
+sudo passwd nom_du_compte
+
+# OU supprime le compte si tu ne l'utilises pas
+sudo userdel -r nom_du_compte
+```
+
+### 🔍 Check #3 : Politique de mots de passe
+
+**C'est quoi une bonne politique ?**
+Un mot de passe, c'est comme un mot de passe de carte bleue, mais en mieux :
+- Minimum 14 caractères (oui, 14 !)
+- Mélange de majuscules, minuscules, chiffres, symboles
+- Expire régulièrement (genre tous les 90-365 jours)
+
+**Vérifie :**
+```bash
+# Regarde les règles actuelles
+sudo grep pam_pwquality /etc/pam.d/common-password
+
+# Vérifie la config détaillée
+cat /etc/security/pwquality.conf | grep -v "^#" | grep -v "^$"
+```
+
+**✅ Configuration sécurisée :**
+```
+minlen = 14
+dcredit = -1   # Au moins 1 chiffre
+ucredit = -1   # Au moins 1 majuscule
+lcredit = -1   # Au moins 1 minuscule
+ocredit = -1   # Au moins 1 caractère spécial
+```
+
+**🔧 Configurer une bonne politique :**
+```bash
+# Édite le fichier de config
+sudo nano /etc/security/pwquality.conf
+
+# Ajoute/modifie ces lignes :
 minlen = 14
 dcredit = -1
 ucredit = -1
 lcredit = -1
 ocredit = -1
 minclass = 3
-maxrepeat = 3
-maxclassrepeat = 4
-gecoscheck = 1
-dictcheck = 1
-usercheck = 1
-enforcing = 1
-
-# Configuration recommandée dans /etc/login.defs
-PASS_MAX_DAYS   90
-PASS_MIN_DAYS   1
-PASS_WARN_AGE   7
+maxrepeat = 2
 ```
 
-#### 2.3 Verrouillage de compte après échecs
-
-**Objectif :** Vérifier que les comptes sont verrouillés après plusieurs tentatives échouées
-
-**Justification :** Protège contre les attaques par force brute en limitant le nombre de tentatives.
-
-**Procédure :**
+**Configurer l'expiration :**
 ```bash
-# Vérifier la configuration de pam_faillock
-grep pam_faillock /etc/pam.d/common-auth
-cat /etc/security/faillock.conf
+# Dans /etc/login.defs
+sudo nano /etc/login.defs
 
-# Vérifier les comptes actuellement verrouillés
-sudo faillock --user <username>
+# Trouve et modifie :
+PASS_MAX_DAYS   90    # Les mots de passe expirent après 90 jours
+PASS_MIN_DAYS   1     # On ne peut pas changer son mot de passe avant 1 jour
+PASS_WARN_AGE   7     # Avertissement 7 jours avant expiration
 ```
 
-**Résultats attendus :**
-- ✅ `pam_faillock.so` configuré dans PAM
-- ✅ Verrouillage après 5 échecs maximum (CIS)
-- ✅ Durée de verrouillage : 900 secondes (15 minutes)
-- ✅ Root également soumis au verrouillage
-
-**Risques identifiés :**
-| Configuration | Criticité | Risque |
-|---------------|-----------|---------|
-| Pas de limitation | 🔴 CRITIQUE | Force brute illimitée |
-| Seuil > 10 tentatives | 🟠 ÉLEVÉ | Fenêtre d'attaque trop large |
-| Root exclu | 🟠 ÉLEVÉ | Attaques ciblées sur root |
-
-**Recommandations :**
-```bash
-# Configuration dans /etc/security/faillock.conf
-deny = 5
-unlock_time = 900
-fail_interval = 900
-even_deny_root
-```
+> **💡 Astuce :** Ces paramètres s'appliquent aux NOUVEAUX comptes. Pour les comptes existants, utilise `sudo chage -M 90 username` pour changer l'expiration.
 
 ---
 
-### 3. CONFIGURATION SSH
+## 🚪 Partie 3 : SSH - Ta Porte d'Entrée
 
-#### 3.1 Durcissement du service SSH
+### 💬 Qu'est-ce qu'on cherche ?
 
-**Objectif :** S'assurer que SSH est configuré de manière sécurisée
+SSH (Secure Shell), c'est ta porte d'entrée principale sur le serveur. On veut qu'elle soit blindée comme la porte d'une banque !
 
-**Justification :** SSH est souvent la principale porte d'entrée vers les serveurs. Une configuration faible expose à des risques de compromission.
+### 🤔 Pourquoi c'est critique ?
 
-**Procédure :**
+SSH, c'est ce que tout le monde utilise pour se connecter à un serveur Linux. Si c'est mal configuré :
+- Les robots scannent Internet 24/7 pour trouver des SSH mal protégés
+- Ils tentent des milliers de mots de passe par seconde
+- Une fois entrés, c'est game over
+
+**Fun fact :** Si tu regardes tes logs, tu verras des MILLIERS de tentatives de connexion SSH par jour. C'est normal, c'est Internet ! 🤖
+
+### 🔍 Check complet de SSH
+
 ```bash
-# Audit complet de la configuration SSH
-sudo sshd -T
+# Vérifi la config complète
+sudo sshd -T | grep -E "permitroot|password|pubkey|maxauth|clientalive"
 
-# Vérifier les paramètres critiques
-grep -E "^(Protocol|PermitRootLogin|PubkeyAuthentication|PasswordAuthentication|PermitEmptyPasswords|X11Forwarding|MaxAuthTries|ClientAliveInterval|ClientAliveCountMax|LoginGraceTime|MaxSessions|AllowUsers|AllowGroups)" /etc/ssh/sshd_config
+# Ou regarde le fichier directement
+sudo cat /etc/ssh/sshd_config | grep -v "^#" | grep -v "^$"
 ```
 
-**Résultats attendus :**
+### ✅ Configuration EN OR
+
+Voici la config idéale (checklist) :
+
 ```
-Protocol 2
+PermitRootLogin no                    # Root ne peut PAS se connecter
+PasswordAuthentication no             # Seulement les clés SSH (pas de mot de passe)
+PubkeyAuthentication yes              # Clés SSH activées
+PermitEmptyPasswords no               # Mots de passe vides = NON
+MaxAuthTries 3                        # 3 essais max
+ClientAliveInterval 300               # Déconnexion auto après 5 min d'inactivité
+ClientAliveCountMax 2                 # 2 messages max avant déconnexion
+X11Forwarding no                      # Pas de X11 (on n'en a pas besoin)
+```
+
+### ❌ Configurations DANGEREUSES
+
+| Configuration | Niveau Danger | Pourquoi c'est grave |
+|---------------|---------------|----------------------|
+| `PasswordAuthentication yes` | 🔴 URGENT | Les robots testent des millions de mots de passe |
+| `PermitRootLogin yes` | 🔴 URGENT | Connexion directe en root = jackpot pour le hacker |
+| `PermitEmptyPasswords yes` | 🔴 URGENT | Connexion sans mot de passe, sérieusement ?! |
+| `X11Forwarding yes` | 🟡 À corriger | Failles de sécurité potentielles |
+| Pas de limite de tentatives | 🟠 Important | Attaques par force brute infinies |
+
+### 🔧 Sécuriser SSH comme un pro
+
+**Étape 1 : Créer des clés SSH (si pas déjà fait)**
+
+Sur TON ordinateur (pas le serveur) :
+```bash
+# Génère une paire de clés
+ssh-keygen -t ed25519 -C "mon-email@example.com"
+
+# Copie ta clé sur le serveur
+ssh-copy-id votre_user@ip_du_serveur
+```
+
+> **💡 C'est quoi ed25519 ?** Un algorithme de chiffrement moderne et super sécurisé. Plus court et plus sûr que RSA !
+
+**Étape 2 : Durcir la config SSH**
+
+```bash
+# Sauvegarde d'abord (on est prudents !)
+sudo cp /etc/ssh/sshd_config /etc/ssh/sshd_config.backup
+
+# Édite la config
+sudo nano /etc/ssh/sshd_config
+```
+
+Modifie/ajoute ces lignes :
+```
+# Désactiver root
 PermitRootLogin no
+
+# Authentification par clés uniquement
 PubkeyAuthentication yes
 PasswordAuthentication no
 PermitEmptyPasswords no
-X11Forwarding no
-MaxAuthTries 4
+
+# Limiter les tentatives
+MaxAuthTries 3
+LoginGraceTime 60
+
+# Déconnexion auto
 ClientAliveInterval 300
 ClientAliveCountMax 2
-LoginGraceTime 60
-MaxSessions 10
-AllowUsers <liste_specifique> OU AllowGroups <groupes_specifiques>
+
+# Désactiver X11
+X11Forwarding no
+
+# Limiter aux utilisateurs spécifiques (optionnel)
+AllowUsers votre_user
 ```
 
-**Risques identifiés :**
-| Configuration | Criticité | Risque |
-|---------------|-----------|---------|
-| PasswordAuthentication yes | 🔴 CRITIQUE | Attaques par force brute |
-| PermitRootLogin yes | 🔴 CRITIQUE | Compromission compte root |
-| PermitEmptyPasswords yes | 🔴 CRITIQUE | Accès sans authentification |
-| X11Forwarding yes | 🟡 MOYEN | Faille de sécurité X11 |
-| Pas de restriction utilisateurs | 🟡 MOYEN | Surface d'attaque élargie |
+**Étape 3 : Teste AVANT de redémarrer !**
 
-**Recommandations :**
+⚠️ **SUPER IMPORTANT** : Ne ferme PAS ta session SSH actuelle !
+
+Dans une NOUVELLE fenêtre de terminal :
 ```bash
-# Configuration sécurisée dans /etc/ssh/sshd_config
-Protocol 2
-PermitRootLogin no
-PubkeyAuthentication yes
-PasswordAuthentication no
-PermitEmptyPasswords no
-X11Forwarding no
-MaxAuthTries 4
-ClientAliveInterval 300
-ClientAliveCountMax 2
-LoginGraceTime 60
-MaxSessions 10
-AllowGroups ssh-users
+# Teste que la config est valide
+sudo sshd -t
 
-# Créer le groupe et ajouter les utilisateurs autorisés
-sudo groupadd ssh-users
-sudo usermod -a -G ssh-users <username>
-
-# Redémarrer SSH
+# Si pas d'erreur, redémarre SSH
 sudo systemctl restart sshd
+
+# Teste la connexion dans la nouvelle fenêtre
+ssh votre_user@ip_du_serveur
 ```
 
-#### 3.2 Clés SSH et algorithmes cryptographiques
+Si ça marche, bravo ! Si ça ne marche pas, tu as toujours ta première session ouverte pour réparer.
 
-**Objectif :** Vérifier que seuls des algorithmes cryptographiques robustes sont utilisés
+> **🆘 En cas de problème :** Retourne dans ta session SSH d'origine et restaure la sauvegarde : `sudo cp /etc/ssh/sshd_config.backup /etc/ssh/sshd_config && sudo systemctl restart sshd`
 
-**Justification :** Les algorithmes faibles (MD5, SHA1, DSA) sont vulnérables aux attaques cryptographiques modernes.
+### 🛡️ Bonus : Fail2Ban - Le videur automatique
 
-**Procédure :**
+Fail2Ban, c'est comme un videur de boîte qui ban automatiquement les gens qui essaient trop de fois de rentrer avec le mauvais mot de passe.
+
 ```bash
-# Vérifier les algorithmes activés
-sudo sshd -T | grep -E "ciphers|macs|kexalgorithms|hostkeyalgorithms"
+# Installer Fail2Ban
+sudo apt install fail2ban -y
 
-# Vérifier les clés hôtes présentes
-ls -la /etc/ssh/ssh_host_*_key*
+# Créer une config personnalisée
+sudo nano /etc/fail2ban/jail.local
 ```
 
-**Résultats attendus :**
-- ✅ Ciphers : chacha20-poly1305, aes256-gcm, aes256-ctr
-- ✅ MACs : hmac-sha2-512, hmac-sha2-256
-- ✅ KexAlgorithms : curve25519-sha256, diffie-hellman-group-exchange-sha256
-- ✅ HostKeyAlgorithms : ssh-ed25519, rsa-sha2-512, rsa-sha2-256
-- ❌ Pas de : 3des, arcfour, md5, sha1, dsa
+Ajoute :
+```ini
+[sshd]
+enabled = true
+port = ssh
+filter = sshd
+logpath = /var/log/auth.log
+maxretry = 3          # 3 essais ratés
+bantime = 3600        # Banni pour 1 heure
+findtime = 600        # Dans une fenêtre de 10 minutes
+```
 
-**Risques identifiés :**
-| Configuration | Criticité | Risque |
-|---------------|-----------|---------|
-| Algorithmes faibles activés | 🔴 CRITIQUE | Décryptage des communications |
-| Clés DSA présentes | 🟠 ÉLEVÉ | Algorithme obsolète et faible |
-| Clés RSA < 2048 bits | 🟠 ÉLEVÉ | Factorisation possible |
-
-**Recommandations :**
 ```bash
-# Configuration dans /etc/ssh/sshd_config
-Ciphers chacha20-poly1305@openssh.com,aes256-gcm@openssh.com,aes128-gcm@openssh.com,aes256-ctr,aes192-ctr,aes128-ctr
-MACs hmac-sha2-512-etm@openssh.com,hmac-sha2-256-etm@openssh.com,hmac-sha2-512,hmac-sha2-256
-KexAlgorithms curve25519-sha256,curve25519-sha256@libssh.org,diffie-hellman-group-exchange-sha256
-HostKeyAlgorithms ssh-ed25519,rsa-sha2-512,rsa-sha2-256
+# Redémarre Fail2Ban
+sudo systemctl restart fail2ban
 
-# Supprimer les anciennes clés faibles
-sudo rm /etc/ssh/ssh_host_dsa_key*
-sudo rm /etc/ssh/ssh_host_ecdsa_key*
+# Vérifie que ça tourne
+sudo fail2ban-client status sshd
+```
 
-# Regénérer des clés fortes si nécessaire
-sudo ssh-keygen -t ed25519 -f /etc/ssh/ssh_host_ed25519_key -N ""
-sudo ssh-keygen -t rsa -b 4096 -f /etc/ssh/ssh_host_rsa_key -N ""
+**Voir qui est banni :**
+```bash
+sudo fail2ban-client status sshd
+```
+
+**Débannir quelqu'un (si tu t'es auto-banni, oups !) :**
+```bash
+sudo fail2ban-client set sshd unbanip ADRESSE_IP
 ```
 
 ---
 
-### 4. PARE-FEU ET RÉSEAU
+## 🔥 Partie 4 : Le Pare-feu (UFW)
 
-#### 4.1 Configuration du pare-feu UFW
+### 💬 Qu'est-ce qu'on cherche ?
 
-**Objectif :** Vérifier qu'un pare-feu est actif et correctement configuré
+On veut vérifier que ton serveur a un pare-feu actif qui bloque tout ce qui n'est pas explicitement autorisé.
 
-**Justification :** Un pare-feu correctement configuré réduit la surface d'attaque en bloquant les services non nécessaires.
+### 🤔 L'analogie simple
 
-**Procédure :**
+Un pare-feu, c'est comme un videur à l'entrée d'un club :
+- Par défaut, personne ne rentre
+- Seules les personnes sur la liste (les ports autorisés) peuvent entrer
+- Tout le reste est gentiment redirigé vers la sortie
+
+Sans pare-feu = portes grandes ouvertes sur Internet. Pas top !
+
+### 🔍 Vérifier l'état du pare-feu
+
 ```bash
-# Vérifier le statut UFW
+# Voir si UFW est actif
 sudo ufw status verbose
 
-# Vérifier les règles détaillées
+# Voir les règles numérotées
 sudo ufw status numbered
-
-# Vérifier si iptables est utilisé directement
-sudo iptables -L -n -v
-sudo ip6tables -L -n -v
 ```
 
-**Résultats attendus :**
-- ✅ UFW actif : `Status: active`
-- ✅ Politique par défaut : `Default: deny (incoming), allow (outgoing)`
-- ✅ Seuls les ports nécessaires sont ouverts
-- ✅ Règles IPv6 également configurées
+### ✅ Ce que tu veux voir
 
-**Risques identifiés :**
-| Configuration | Criticité | Risque |
-|---------------|-----------|---------|
-| Pare-feu inactif | 🔴 CRITIQUE | Tous les services exposés |
-| Default policy allow | 🔴 CRITIQUE | Aucune protection |
-| Ports inutiles ouverts | 🟠 ÉLEVÉ | Surface d'attaque élargie |
-| IPv6 non protégé | 🟠 ÉLEVÉ | Contournement via IPv6 |
+```
+Status: active
+Logging: on (low)
+Default: deny (incoming), allow (outgoing), disabled (routed)
 
-**Recommandations :**
+To                         Action      From
+--                         ------      ----
+22/tcp                     ALLOW IN    Anywhere
+```
+
+**Traduction :**
+- ✅ Status active = Le pare-feu fonctionne
+- ✅ Default deny incoming = Par défaut, tout est bloqué (bien !)
+- ✅ SSH (port 22) autorisé = Tu peux te connecter
+
+### ❌ Signaux d'alarme
+
+```
+Status: inactive  # ← 🔴 PAS BON DU TOUT !
+```
+
+**Ou pire :**
+```
+Default: allow (incoming)  # ← 🔴 Tout est ouvert !
+```
+
+### 🔧 Activer et configurer UFW
+
+**Étape 1 : Active UFW**
+
+⚠️ **ATTENTION** : Si tu es connecté en SSH, autorise d'abord le port SSH AVANT d'activer le pare-feu, sinon tu te coupes toi-même !
+
 ```bash
-# Activer et configurer UFW
-sudo ufw default deny incoming
-sudo ufw default allow outgoing
-sudo ufw default deny routed
+# AVANT TOUT : Autorise SSH
+sudo ufw allow 22/tcp
 
-# Autoriser uniquement les services nécessaires
-sudo ufw allow 22/tcp comment 'SSH'
-# Ajouter d'autres règles selon les besoins
+# OU si tu veux limiter aux tentatives de connexion (recommandé)
+sudo ufw limit 22/tcp  # Limite les tentatives (anti brute-force)
 
-# Activer UFW
+# Active le pare-feu
 sudo ufw enable
 
-# Activer le logging
-sudo ufw logging on
+# Vérifie
+sudo ufw status
 ```
 
-#### 4.2 Désactivation des protocoles réseau non utilisés
+**Étape 2 : Règles par défaut**
 
-**Objectif :** Désactiver les protocoles réseau inutiles (IPv6 si non utilisé, etc.)
-
-**Justification :** Les protocoles non utilisés augmentent la surface d'attaque sans bénéfice.
-
-**Procédure :**
 ```bash
-# Vérifier si IPv6 est utilisé
-ip -6 addr show
+# Bloque tout entrant par défaut
+sudo ufw default deny incoming
 
-# Vérifier la configuration de désactivation
-cat /etc/sysctl.conf | grep ipv6
-
-# Vérifier les protocoles obsolètes
-cat /etc/modprobe.d/blacklist.conf | grep -E "dccp|sctp|rds|tipc"
+# Autorise tout sortant
+sudo ufw default allow outgoing
 ```
 
-**Résultats attendus :**
-- Si IPv6 non utilisé : désactivé dans sysctl
-- Protocoles obsolètes blacklistés : dccp, sctp, rds, tipc
+**Étape 3 : Autorise seulement ce dont tu as besoin**
 
-**Risques identifiés :**
-| Configuration | Criticité | Risque |
-|---------------|-----------|---------|
-| IPv6 actif mais non surveillé | 🟠 ÉLEVÉ | Contournement des règles de sécurité IPv4 |
-| Protocoles obsolètes actifs | 🟡 MOYEN | Vulnérabilités non patchées |
-
-**Recommandations :**
 ```bash
-# Si IPv6 n'est pas utilisé, dans /etc/sysctl.conf
-net.ipv6.conf.all.disable_ipv6 = 1
-net.ipv6.conf.default.disable_ipv6 = 1
-net.ipv6.conf.lo.disable_ipv6 = 1
+# Exemples courants :
 
-# Blacklister les protocoles obsolètes dans /etc/modprobe.d/blacklist.conf
-install dccp /bin/true
-install sctp /bin/true
-install rds /bin/true
-install tipc /bin/true
+# SSH (déjà fait)
+sudo ufw limit 22/tcp
 
-# Appliquer
-sudo sysctl -p
+# HTTP (site web)
+sudo ufw allow 80/tcp
+
+# HTTPS (site web sécurisé)
+sudo ufw allow 443/tcp
+
+# MySQL depuis un serveur spécifique
+sudo ufw allow from 192.168.1.100 to any port 3306
 ```
 
-#### 4.3 Durcissement réseau (sysctl)
-
-**Objectif :** Vérifier les paramètres de durcissement réseau du noyau
-
-**Justification :** Ces paramètres protègent contre diverses attaques réseau (spoofing, routing attacks, SYN floods, etc.)
-
-**Procédure :**
+**Voir et supprimer des règles :**
 ```bash
-# Vérifier les paramètres actuels
-sudo sysctl -a | grep -E "net.ipv4.conf.all.accept_source_route|net.ipv4.conf.all.send_redirects|net.ipv4.conf.all.accept_redirects|net.ipv4.icmp_echo_ignore_broadcasts|net.ipv4.tcp_syncookies|net.ipv4.conf.all.rp_filter|net.ipv4.conf.all.log_martians"
+# Voir les règles numérotées
+sudo ufw status numbered
+
+# Supprimer la règle numéro 3
+sudo ufw delete 3
 ```
 
-**Résultats attendus :**
-```
-net.ipv4.conf.all.accept_source_route = 0
-net.ipv4.conf.default.accept_source_route = 0
-net.ipv4.conf.all.send_redirects = 0
-net.ipv4.conf.default.send_redirects = 0
-net.ipv4.conf.all.accept_redirects = 0
-net.ipv4.conf.default.accept_redirects = 0
-net.ipv4.icmp_echo_ignore_broadcasts = 1
-net.ipv4.tcp_syncookies = 1
-net.ipv4.conf.all.rp_filter = 1
-net.ipv4.conf.default.rp_filter = 1
-net.ipv4.conf.all.log_martians = 1
-net.ipv4.icmp_ignore_bogus_error_responses = 1
-```
+### 💡 Règles d'or du pare-feu
 
-**Risques identifiés :**
-| Configuration | Criticité | Risque |
-|---------------|-----------|---------|
-| Source routing activé | 🔴 CRITIQUE | IP spoofing, man-in-the-middle |
-| Pas de SYN cookies | 🟠 ÉLEVÉ | SYN flood DoS |
-| Redirects activés | 🟠 ÉLEVÉ | Redirection de trafic malveillante |
-| RP filter désactivé | 🟡 MOYEN | Spoofing d'adresses IP |
-
-**Recommandations :**
-```bash
-# Configuration dans /etc/sysctl.conf ou /etc/sysctl.d/99-security.conf
-# Protection contre le source routing
-net.ipv4.conf.all.accept_source_route = 0
-net.ipv4.conf.default.accept_source_route = 0
-
-# Désactiver les ICMP redirects
-net.ipv4.conf.all.send_redirects = 0
-net.ipv4.conf.default.send_redirects = 0
-net.ipv4.conf.all.accept_redirects = 0
-net.ipv4.conf.default.accept_redirects = 0
-
-# Protection contre les attaques
-net.ipv4.icmp_echo_ignore_broadcasts = 1
-net.ipv4.tcp_syncookies = 1
-net.ipv4.conf.all.rp_filter = 1
-net.ipv4.conf.default.rp_filter = 1
-net.ipv4.conf.all.log_martians = 1
-net.ipv4.icmp_ignore_bogus_error_responses = 1
-
-# Appliquer
-sudo sysctl -p
-```
+1. **Whitelisting > Blacklisting** : Bloque tout, puis autorise uniquement ce qui est nécessaire
+2. **Spécificité** : Plus ta règle est précise, mieux c'est (IP source, port précis)
+3. **Documentation** : Note pourquoi tu ouvres un port (commentaires)
+4. **Révision** : Tous les 3-6 mois, vérifie que tu as toujours besoin de chaque règle
 
 ---
 
-### 5. AUDIT ET LOGGING
+## 📝 Partie 5 : Les Logs - Ta Vidéosurveillance
 
-#### 5.1 Configuration d'auditd
+### 💬 Qu'est-ce qu'on cherche ?
 
-**Objectif :** Vérifier que le système d'audit est actif et correctement configuré
+Les logs (journaux), c'est comme les caméras de surveillance : ça enregistre tout ce qui se passe. On veut s'assurer qu'ils fonctionnent !
 
-**Justification :** Auditd permet de tracer les événements de sécurité critiques pour la détection d'intrusion et l'investigation.
+### 🤔 Pourquoi c'est crucial ?
 
-**Procédure :**
+Sans logs :
+- Tu ne sais pas si quelqu'un essaie de pirater ton serveur
+- En cas d'incident, tu es aveugle pour comprendre ce qui s'est passé
+- Tu ne peux pas détecter les comportements suspects
+
+Avec de bons logs, tu peux :
+- Détecter les attaques en cours
+- Faire de l'investigation après un incident
+- Prouver ce qui s'est passé (légalement important !)
+
+### 🔍 Check #1 : Les logs système
+
 ```bash
-# Vérifier le statut d'auditd
-sudo systemctl status auditd
+# Voir les dernières connexions SSH
+sudo last | head -20
 
-# Vérifier les règles d'audit
-sudo auditctl -l
+# Voir les tentatives de connexion échouées
+sudo lastb | head -20
 
-# Vérifier la configuration
-cat /etc/audit/auditd.conf
-cat /etc/audit/rules.d/*.rules
+# Voir les logs système récents
+sudo journalctl -n 50 --no-pager
+
+# Logs d'authentification
+sudo tail -50 /var/log/auth.log
 ```
 
-**Résultats attendus :**
-- ✅ Service auditd actif et enabled
-- ✅ Règles d'audit pour les fichiers critiques (/etc/passwd, /etc/shadow, etc.)
-- ✅ Audit des appels système privilégiés
-- ✅ Audit des modifications de configuration réseau
-- ✅ Retention des logs : min 30 jours
+**✅ Ce que tu devrais voir :**
+- Tes propres connexions
+- Quelques tentatives échouées (normal, les bots scannent tout Internet)
 
-**Risques identifiés :**
-| Configuration | Criticité | Risque |
-|---------------|-----------|---------|
-| Auditd non actif | 🔴 CRITIQUE | Aucune traçabilité des événements de sécurité |
-| Pas de règles définies | 🟠 ÉLEVÉ | Événements critiques non tracés |
-| Retention < 7 jours | 🟡 MOYEN | Investigation limitée |
+**❌ Alerte si :**
+- Des MILLIERS de tentatives échouées depuis la même IP récemment
+- Des connexions réussies depuis des IPs que tu ne reconnais pas
+- Pas de logs du tout (si les fichiers sont vides)
 
-**Recommandations :**
+### 🔍 Check #2 : Auditd - Le détective privé
+
+Auditd enregistre des événements de sécurité spécifiques.
+
 ```bash
-# Installer auditd si nécessaire
-sudo apt install auditd audispd-plugins
+# Vérifie qu'il tourne
+sudo systemctl status auditd
 
-# Exemple de règles dans /etc/audit/rules.d/hardening.rules
-## Audit des fichiers critiques
+# Voir les règles d'audit
+sudo auditctl -l
+```
+
+**Configurer des règles d'audit importantes :**
+
+```bash
+# Crée un fichier de règles
+sudo nano /etc/audit/rules.d/security.rules
+```
+
+Ajoute :
+```bash
+# Surveiller les fichiers de mots de passe
 -w /etc/passwd -p wa -k identity
 -w /etc/group -p wa -k identity
 -w /etc/shadow -p wa -k identity
--w /etc/gshadow -p wa -k identity
 
-## Audit des modifications système
+# Surveiller les modifications SSH
+-w /etc/ssh/sshd_config -p wa -k sshd_config
+
+# Surveiller sudo
 -w /etc/sudoers -p wa -k sudoers
--w /etc/sudoers.d/ -p wa -k sudoers
 
-## Audit SSH
--w /etc/ssh/sshd_config -p wa -k sshd
+# Surveiller les connexions réseau
+-a always,exit -F arch=b64 -S connect -k network_connections
+```
 
-## Audit des appels système privilégiés
--a always,exit -F arch=b64 -S adjtimex -S settimeofday -k time-change
--a always,exit -F arch=b64 -S sethostname -S setdomainname -k system-locale
-
-## Audit des modifications réseau
--a always,exit -F arch=b64 -S sethostname -S setdomainname -k network_modifications
--w /etc/hosts -p wa -k network_modifications
--w /etc/network/ -p wa -k network_modifications
-
-# Recharger les règles
+```bash
+# Recharge les règles
 sudo augenrules --load
 
-# Activer et démarrer
-sudo systemctl enable auditd
-sudo systemctl start auditd
+# Vérifie
+sudo auditctl -l
 ```
 
-#### 5.2 Configuration de rsyslog
-
-**Objectif :** Vérifier que les logs système sont correctement collectés et conservés
-
-**Justification :** Les logs sont essentiels pour la détection d'incidents, le troubleshooting et la conformité réglementaire.
-
-**Procédure :**
+**Chercher dans les logs d'audit :**
 ```bash
-# Vérifier le statut de rsyslog
-sudo systemctl status rsyslog
+# Rechercher les événements SSH
+sudo ausearch -k sshd_config
 
-# Vérifier la configuration
-cat /etc/rsyslog.conf
-ls -la /etc/rsyslog.d/
-
-# Vérifier les permissions des fichiers de logs
-ls -la /var/log/
-```
-
-**Résultats attendus :**
-- ✅ rsyslog actif et enabled
-- ✅ Logs des services critiques configurés
-- ✅ Permissions restrictives sur /var/log/* (640 ou 600)
-- ✅ Centralisation des logs (optionnel mais recommandé)
-
-**Risques identifiés :**
-| Configuration | Criticité | Risque |
-|---------------|-----------|---------|
-| rsyslog non actif | 🔴 CRITIQUE | Perte de traçabilité complète |
-| Permissions 644 ou 777 | 🟠 ÉLEVÉ | Lecture des logs par utilisateurs non autorisés |
-| Pas de centralisation | 🟡 MOYEN | Perte de logs si compromission |
-
-**Recommandations :**
-```bash
-# Vérifier les permissions
-sudo chmod 640 /var/log/syslog
-sudo chmod 640 /var/log/auth.log
-
-# Configurer la rotation des logs dans /etc/logrotate.d/rsyslog
-/var/log/syslog
-{
-    rotate 7
-    daily
-    missingok
-    notifempty
-    delaycompress
-    compress
-    postrotate
-        /usr/lib/rsyslog/rsyslog-rotate
-    endscript
-}
+# Rechercher les modifications de mots de passe
+sudo ausearch -k identity
 ```
 
 ---
 
-### 6. SERVICES ET DÉMONS
+## 🎯 Checklist Rapide Finale
 
-#### 6.1 Inventaire des services actifs
+Voici ta checklist à cocher. Si tu as tout en ✅, ton serveur est plutôt bien sécurisé !
 
-**Objectif :** Identifier tous les services en cours d'exécution
+### Mises à jour
+- [ ] Mises à jour de sécurité installées (< 7 jours)
+- [ ] Mises à jour automatiques activées
+- [ ] Aucune mise à jour critique en attente
 
-**Justification :** Chaque service actif est une surface d'attaque potentielle. Seuls les services nécessaires doivent être actifs.
+### Comptes et authentification
+- [ ] Compte root : login SSH désactivé
+- [ ] Aucun compte sans mot de passe
+- [ ] Politique de mots de passe : 14 caractères minimum
+- [ ] Expiration des mots de passe : < 365 jours
+- [ ] Comptes inutilisés supprimés
 
-**Procédure :**
-```bash
-# Lister tous les services actifs
-sudo systemctl list-units --type=service --state=running
+### SSH
+- [ ] PasswordAuthentication = no (clés SSH seulement)
+- [ ] PermitRootLogin = no
+- [ ] Fail2Ban actif
+- [ ] Limite de tentatives configurée (MaxAuthTries)
+- [ ] Timeout configuré (ClientAliveInterval)
 
-# Lister les services enabled au démarrage
-sudo systemctl list-unit-files --type=service --state=enabled
+### Pare-feu
+- [ ] UFW actif
+- [ ] Politique par défaut : deny incoming
+- [ ] Seuls les ports nécessaires ouverts
+- [ ] SSH en mode limit (anti brute-force)
 
-# Vérifier les ports en écoute
-sudo ss -tulpn
+### Logs et audit
+- [ ] Auditd actif
+- [ ] Règles d'audit configurées
+- [ ] Logs protégés (permissions 640)
+- [ ] Rotation des logs configurée
 
-# Vérifier les processus
-sudo ps aux
-```
+### Services
+- [ ] Liste des services actifs vérifiée
+- [ ] Services inutiles désactivés
+- [ ] Pas de services suspects
 
-**Résultats attendus :**
-- ✅ Liste minimale de services nécessaires
-- ✅ Pas de services inutiles (telnet, ftp, rsh, etc.)
-- ✅ Chaque service justifié et documenté
-
-**Risques identifiés :**
-| Configuration | Criticité | Risque |
-|---------------|-----------|---------|
-| Services obsolètes actifs (telnet, rsh) | 🔴 CRITIQUE | Protocoles non chiffrés, vulnérabilités connues |
-| Services non nécessaires | 🟠 ÉLEVÉ | Surface d'attaque élargie |
-| Ports non documentés | 🟡 MOYEN | Services fantômes ou malveillants |
-
-**Recommandations :**
-```bash
-# Désactiver les services inutiles (exemples)
-sudo systemctl stop <service>
-sudo systemctl disable <service>
-
-# Services typiquement à désactiver si non utilisés :
-# - avahi-daemon (mDNS)
-# - cups (impression)
-# - bluetooth
-# - rpcbind (si pas de NFS)
-```
-
-#### 6.2 Vérification de l'absence de rootkits
-
-**Objectif :** Détecter la présence éventuelle de rootkits
-
-**Justification :** Les rootkits permettent à un attaquant de maintenir un accès persistant et caché au système.
-
-**Procédure :**
-```bash
-# Scanner avec rkhunter
-sudo rkhunter --update
-sudo rkhunter --check --sk
-
-# Scanner avec chkrootkit
-sudo chkrootkit
-
-# Vérifier l'intégrité avec AIDE
-sudo aide --check
-```
-
-**Résultats attendus :**
-- ✅ Aucun rootkit détecté
-- ✅ Aucune modification suspecte de binaires système
-- ✅ Base AIDE à jour et cohérente
-
-**Risques identifiés :**
-| Détection | Criticité | Risque |
-|-----------|-----------|---------|
-| Rootkit détecté | 🔴 CRITIQUE | Système compromis |
-| Binaires modifiés | 🔴 CRITIQUE | Backdoor ou trojan |
-| AIDE non configuré | 🟡 MOYEN | Impossible de détecter les modifications |
-
-**Recommandations :**
-```bash
-# Initialiser AIDE
-sudo aideinit
-sudo mv /var/lib/aide/aide.db.new /var/lib/aide/aide.db
-
-# Planifier des vérifications régulières (cron)
-echo "0 5 * * * root /usr/bin/aide --check | mail -s 'AIDE Check' admin@example.com" | sudo tee -a /etc/crontab
-```
+### Système de fichiers
+- [ ] Permissions fichiers sensibles OK (shadow = 640)
+- [ ] Pas de fichiers world-writable
+- [ ] Partitions /tmp et /var avec noexec
 
 ---
 
-### 7. SÉCURITÉ DU SYSTÈME DE FICHIERS
+## 🚀 Aller Plus Loin
 
-#### 7.1 Permissions sur fichiers sensibles
+### Audit automatique avec Lynis
 
-**Objectif :** Vérifier que les fichiers sensibles ont des permissions restrictives
+Lynis est un outil qui fait un audit automatique. C'est comme avoir un expert qui vérifie tout pour toi !
 
-**Justification :** Des permissions trop laxistes permettent à des utilisateurs non autorisés de lire ou modifier des fichiers critiques.
-
-**Procédure :**
 ```bash
-# Vérifier les permissions des fichiers critiques
-ls -l /etc/passwd /etc/shadow /etc/group /etc/gshadow
-ls -l /boot/grub/grub.cfg
-ls -l /etc/ssh/sshd_config
+# Installer Lynis
+sudo apt install lynis -y
 
-# Rechercher les fichiers world-writable
-sudo find / -xdev -type f -perm -0002 -ls 2>/dev/null
-
-# Rechercher les fichiers sans propriétaire
-sudo find / -xdev \( -nouser -o -nogroup \) -ls 2>/dev/null
-```
-
-**Résultats attendus :**
-```
--rw-r--r-- /etc/passwd (644)
--rw-r----- /etc/shadow (640 ou 600)
--rw-r--r-- /etc/group (644)
--rw-r----- /etc/gshadow (640 ou 600)
--rw------- /boot/grub/grub.cfg (600)
--rw------- /etc/ssh/sshd_config (600)
-```
-
-**Risques identifiés :**
-| Configuration | Criticité | Risque |
-|---------------|-----------|---------|
-| /etc/shadow lisible par tous | 🔴 CRITIQUE | Extraction et cracking des hash de mots de passe |
-| Fichiers world-writable | 🔴 CRITIQUE | Modification malveillante |
-| Fichiers sans propriétaire | 🟠 ÉLEVÉ | Fichiers orphelins ou malveillants |
-
-**Recommandations :**
-```bash
-# Corriger les permissions
-sudo chmod 644 /etc/passwd
-sudo chmod 640 /etc/shadow
-sudo chmod 644 /etc/group
-sudo chmod 640 /etc/gshadow
-sudo chmod 600 /boot/grub/grub.cfg
-sudo chmod 600 /etc/ssh/sshd_config
-
-# Supprimer les fichiers world-writable ou corriger
-sudo find / -xdev -type f -perm -0002 -exec chmod o-w {} \;
-```
-
-#### 7.2 Montages de partitions sécurisés
-
-**Objectif :** Vérifier que les partitions sont montées avec des options de sécurité
-
-**Justification :** Les options de montage (noexec, nodev, nosuid) empêchent l'exécution de code malveillant depuis certaines partitions.
-
-**Procédure :**
-```bash
-# Vérifier les options de montage
-mount | grep -E "/tmp|/var|/home"
-cat /etc/fstab
-```
-
-**Résultats attendus :**
-- ✅ `/tmp` : noexec,nodev,nosuid
-- ✅ `/var/tmp` : noexec,nodev,nosuid
-- ✅ `/home` : nodev (minimum)
-- ✅ `/dev/shm` : noexec,nodev,nosuid
-
-**Risques identifiés :**
-| Configuration | Criticité | Risque |
-|---------------|-----------|---------|
-| /tmp sans noexec | 🟠 ÉLEVÉ | Exécution de malware depuis /tmp |
-| /dev/shm sans noexec | 🟠 ÉLEVÉ | Exécution en mémoire |
-| Partitions sans nodev | 🟡 MOYEN | Création de device nodes malveillants |
-
-**Recommandations :**
-```bash
-# Exemple de configuration dans /etc/fstab
-tmpfs /tmp tmpfs defaults,noexec,nodev,nosuid 0 0
-tmpfs /var/tmp tmpfs defaults,noexec,nodev,nosuid 0 0
-tmpfs /dev/shm tmpfs defaults,noexec,nodev,nosuid 0 0
-
-# Remonter immédiatement
-sudo mount -o remount /tmp
-sudo mount -o remount /var/tmp
-sudo mount -o remount /dev/shm
-```
-
----
-
-### 8. SÉCURITÉ DU NOYAU
-
-#### 8.1 Paramètres de sécurité du noyau
-
-**Objectif :** Vérifier les paramètres de durcissement du noyau Linux
-
-**Justification :** Ces paramètres activent des protections contre l'exploitation de vulnérabilités noyau.
-
-**Procédure :**
-```bash
-# Vérifier les paramètres de sécurité
-sudo sysctl -a | grep -E "kernel.dmesg_restrict|kernel.kptr_restrict|kernel.yama.ptrace_scope|kernel.kexec_load_disabled|kernel.unprivileged_bpf_disabled"
-```
-
-**Résultats attendus :**
-```
-kernel.dmesg_restrict = 1
-kernel.kptr_restrict = 2
-kernel.yama.ptrace_scope = 1
-kernel.kexec_load_disabled = 1
-kernel.unprivileged_bpf_disabled = 1
-```
-
-**Risques identifiés :**
-| Configuration | Criticité | Risque |
-|---------------|-----------|---------|
-| dmesg_restrict = 0 | 🟡 MOYEN | Fuite d'informations kernel |
-| kptr_restrict = 0 | 🟠 ÉLEVÉ | Facilite les exploits kernel |
-| ptrace non restreint | 🟠 ÉLEVÉ | Débugage de processus privilégiés |
-
-**Recommandations :**
-```bash
-# Configuration dans /etc/sysctl.d/99-kernel-hardening.conf
-kernel.dmesg_restrict = 1
-kernel.kptr_restrict = 2
-kernel.yama.ptrace_scope = 1
-kernel.kexec_load_disabled = 1
-kernel.unprivileged_bpf_disabled = 1
-
-# Appliquer
-sudo sysctl -p /etc/sysctl.d/99-kernel-hardening.conf
-```
-
----
-
-### 9. CONFORMITÉ ET OUTILS AUTOMATISÉS
-
-#### 9.1 Audit avec Lynis
-
-**Objectif :** Exécuter un audit automatisé complet avec Lynis
-
-**Justification :** Lynis est un outil d'audit reconnu qui vérifie des centaines de points de contrôle.
-
-**Procédure :**
-```bash
-# Mettre à jour Lynis
-sudo lynis update info
-
-# Exécuter l'audit complet
+# Lancer un audit complet
 sudo lynis audit system
 
-# Consulter le rapport
-cat /var/log/lynis.log
+# Voir le rapport
 cat /var/log/lynis-report.dat
 ```
 
-**Résultats attendus :**
-- ✅ Score de durcissement > 80
-- ✅ Pas d'avertissements critiques
-- ✅ Suggestions documentées et analysées
+Lynis va te donner un score et des recommandations. Vise au minimum 75/100 !
 
-**Risques identifiés :**
-| Score Lynis | Criticité | Action |
-|-------------|-----------|---------|
-| < 50 | 🔴 CRITIQUE | Durcissement urgent nécessaire |
-| 50-70 | 🟠 ÉLEVÉ | Améliorations importantes requises |
-| 70-80 | 🟡 MOYEN | Optimisations recommandées |
+### Commande magique pour un rapport rapide
 
-**Recommandations :**
-Analyser chaque suggestion de Lynis et implémenter les corrections appropriées selon le contexte.
+Copie-colle ce script pour un rapport express :
 
----
+```bash
+#!/bin/bash
+echo "=== 🔍 AUDIT EXPRESS ==="
+echo ""
+echo "📊 Mises à jour en attente:"
+apt list --upgradable 2>/dev/null | grep -v "Listing"
+echo ""
+echo "🔑 Comptes sans mot de passe:"
+sudo awk -F: '($2 == "") {print $1}' /etc/shadow
+echo ""
+echo "🚪 Config SSH critique:"
+sudo sshd -T | grep -E "permitroot|passwordauth"
+echo ""
+echo "🔥 État pare-feu:"
+sudo ufw status
+echo ""
+echo "📝 Dernières connexions SSH:"
+sudo last | head -5
+echo ""
+echo "🎯 Score Fail2Ban:"
+sudo fail2ban-client status sshd 2>/dev/null || echo "Fail2Ban non installé"
+echo ""
+echo "=== Fin du rapport ==="
+```
 
-## 📊 Matrice de Criticité Globale
+Sauvegarde-le dans `audit-rapide.sh`, rends-le exécutable et lance-le :
 
-| Niveau | Délai de correction | Exemples |
-|--------|---------------------|----------|
-| 🔴 CRITIQUE | 24-48h | Root login activé, mises à jour critiques manquantes, pas de pare-feu |
-| 🟠 ÉLEVÉ | 1 semaine | Algorithmes faibles, services inutiles, logs non protégés |
-| 🟡 MOYEN | 1 mois | Optimisations mineures, durcissement avancé |
-| 🟢 FAIBLE | Opportunité | Améliorations cosmétiques |
-
----
-
-## ✅ Checklist Finale d'Audit
-
-- [ ] Mises à jour de sécurité installées
-- [ ] Politique de mots de passe robuste
-- [ ] Compte root protégé
-- [ ] SSH durci (clés uniquement, root désactivé)
-- [ ] Pare-feu actif et configuré
-- [ ] Services minimaux actifs
-- [ ] Auditd configuré et actif
-- [ ] Logs collectés et protégés
-- [ ] Permissions fichiers sensibles correctes
-- [ ] Partitions montées avec options sécurisées
-- [ ] Paramètres kernel durcis
-- [ ] Paramètres réseau durcis
-- [ ] Pas de rootkits détectés
-- [ ] Score Lynis > 80
-- [ ] Rapport d'audit documenté
+```bash
+chmod +x audit-rapide.sh
+./audit-rapide.sh
+```
 
 ---
 
-## 📚 Références
+## 📚 Pour Aller Plus Loin
 
-### Documentation officielle
-- [Ubuntu Security Documentation](https://ubuntu.com/security)
-- [CIS Benchmark for Ubuntu Linux](https://www.cisecurity.org/benchmark/ubuntu_linux)
-- [ANSSI-BP-028 (FR)](https://cyber.gouv.fr/publications/configuration-recommendations-gnulinux-system)
-- [NIST National Checklist Program](https://ncp.nist.gov/)
+**Ressources officielles :**
+- [Ubuntu Security Guide](https://ubuntu.com/security) - La doc officielle
+- [CIS Ubuntu Benchmark](https://www.cisecurity.org/benchmark/ubuntu_linux) - Le guide de référence
+- [ANSSI Guide Linux](https://www.ssi.gouv.fr/) - Recommandations françaises
 
-### Standards de sécurité
-- CIS Benchmark Ubuntu 20.04/22.04/24.04
-- ANSSI-BP-028 v2.0
-- NIST SP 800-70
-- STIG (Security Technical Implementation Guide)
-
-### Outils
-- [Lynis](https://cisofy.com/lynis/)
-- [AIDE](https://aide.github.io/)
-- [Rkhunter](http://rkhunter.sourceforge.net/)
-- [Ubuntu Security Guide (USG)](https://ubuntu.com/security/certifications/docs/usg)
-
-### CVE et vulnérabilités
-- [Ubuntu Security Notices](https://ubuntu.com/security/notices)
-- [CVE Database](https://cve.mitre.org/)
-- [NVD - National Vulnerability Database](https://nvd.nist.gov/)
+**Outils supplémentaires :**
+- [Lynis](https://cisofy.com/lynis/) - Audit automatique
+- [AIDE](https://aide.github.io/) - Détection d'intrusion
+- [Tiger](http://www.nongnu.org/tiger/) - Scanner de sécurité
 
 ---
 
-**Note :** Ce guide doit être adapté au contexte spécifique de votre environnement. Certaines recommandations peuvent ne pas être applicables selon vos besoins métier.
+## 🎓 Conclusion
+
+Bravo ! Si tu as suivi ce guide jusqu'ici, ton serveur Ubuntu est maintenant beaucoup plus sécurisé qu'avant. 🎉
+
+**Les points clés à retenir :**
+1. Les mises à jour sont NON-NÉGOCIABLES
+2. SSH = clés SSH uniquement, pas de mots de passe
+3. Le pare-feu doit TOUJOURS être actif
+4. Les logs sont tes meilleurs amis pour détecter les problèmes
+
+**Et surtout :**
+La sécurité, c'est un marathon, pas un sprint. Refais un audit tous les 3-6 mois, garde ton système à jour, et reste vigilant !
+
+Des questions ? Des points pas clairs ? N'hésite pas à creuser la doc ou demander de l'aide sur les forums !
+
+Bonne sécurisation ! 🛡️
+
+---
+
+*Ce guide est maintenu par la communauté. Si tu trouves une erreur ou veux améliorer une explication, n'hésite pas à contribuer !*

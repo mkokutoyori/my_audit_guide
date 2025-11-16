@@ -3539,3 +3539,648 @@ SupportedEncryptionTypes : 24
 **Niveau actuel : 🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟 LÉGENDE ! Respect total ! 🏆**
 
 ---
+
+## 🤖 Script d'Audit Automatisé v2.0
+
+### 🎯 L'Arme Ultime : Automatiser ton Audit !
+
+Après avoir tout lu, tout compris, et tout appliqué... il est temps de passer au **niveau supérieur** ! 🚀
+
+**Le problème** : Faire un audit manuel complet prend du temps (2-3 heures). Et il faut le refaire régulièrement (chaque mois, après chaque changement majeur, etc.)
+
+**La solution** : Un **script PowerShell automatisé** qui vérifie TOUT en quelques minutes ! ⚡
+
+### 📥 Téléchargement du script
+
+Le script est disponible dans le même dossier que ce guide :
+
+```
+📁 os/windows/
+├── windows-server-2022.md          ← Le guide (que tu viens de lire)
+└── audit-windows-server-2022.ps1   ← Le script d'audit automatisé
+```
+
+### 🚀 Utilisation du script
+
+**Étape 1 : Ouvrir PowerShell en Administrateur**
+
+C'est **crucial** ! Le script ne fonctionnera pas sans droits admin.
+
+1. Clique sur le menu Démarrer
+2. Tape "PowerShell"
+3. **Clic droit** sur "Windows PowerShell"
+4. Choisis **"Exécuter en tant qu'administrateur"**
+
+**Étape 2 : Naviguer vers le dossier du script**
+
+```powershell
+cd C:\chemin\vers\le\dossier\
+```
+
+Exemple :
+```powershell
+cd C:\Users\Admin\Downloads\audit\
+```
+
+**Étape 3 : Exécuter le script**
+
+```powershell
+.\audit-windows-server-2022.ps1
+```
+
+**Si tu obtiens une erreur "Execution Policy"** :
+
+```powershell
+Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process -Force
+.\audit-windows-server-2022.ps1
+```
+
+**Explication** :
+- `Set-ExecutionPolicy Bypass` : Autorise l'exécution du script
+- `-Scope Process` : Uniquement pour cette session PowerShell
+- Une fois la fenêtre fermée, la restriction revient (sécurité !)
+
+---
+
+### 📊 Ce que fait le script
+
+Le script vérifie **AUTOMATIQUEMENT** tous les points critiques du guide :
+
+**✅ Partie 1 : Mises à jour**
+- Mises à jour récentes (< 30 jours)
+- Service Windows Update actif
+
+**✅ Partie 2 : Comptes Utilisateurs**
+- Longueur minimale mot de passe >= 14
+- Historique >= 24
+- Compte Guest désactivé
+- Seuil de verrouillage <= 5
+
+**✅ Partie 3 : RDP**
+- NLA activé
+- Chiffrement 128-bit
+- SSL/TLS forcé
+
+**✅ Partie 4 : Pare-feu**
+- Activé sur tous les profils
+- Politique par défaut (Block Inbound)
+
+**✅ Partie 5 : Windows Defender**
+- Antivirus activé
+- Protection en temps réel
+- Signatures à jour (< 7 jours)
+- Cloud Protection
+
+**✅ Partie 6 : Audit et Logs**
+- Taille journal Security >= 512 MB
+- Audit des connexions (Success + Failure)
+
+**✅ Partie 7 : Services**
+- Print Spooler désactivé
+- Remote Registry désactivé
+- SNMP désactivé
+
+**✅ Partie 8 : SMB**
+- SMBv1 DÉSACTIVÉ (critique !)
+- SMB Signing requis
+- Chiffrement SMB3
+- Aucun partage "Everyone : Full"
+
+**✅ Partie 9 : UAC**
+- UAC activé
+- Prompt de consentement
+- Bureau sécurisé
+
+**✅ Partie 10 : Protocoles Réseau**
+- LmCompatibilityLevel = 5
+- Hash LM désactivés
+- Kerberos AES uniquement
+
+---
+
+### 📈 Exemple de résultat
+
+```
+═══════════════════════════════════════════════════════════════════
+  🪟 AUDIT DE SÉCURITÉ - WINDOWS SERVER 2022
+  Version 2.0 - Style 'From Zero to Hero'
+═══════════════════════════════════════════════════════════════════
+
+🔍 Démarrage de l'audit de sécurité...
+📝 Rapport généré dans: .\audit-windows-server-20250116-143022.txt
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📦 PARTIE 1 : MISES À JOUR WINDOWS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ PASS - Mises à jour récentes (< 30 jours)
+✅ PASS - Service Windows Update (wuauserv) actif
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+👤 PARTIE 2 : COMPTES UTILISATEURS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ PASS - Longueur minimale mot de passe >= 14
+✅ PASS - Historique mots de passe >= 24
+✅ PASS - Compte Guest désactivé
+⚠️  WARN - Compte Administrator sécurisé
+✅ PASS - Seuil de verrouillage de compte <= 5
+
+[...]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🌐 PARTIE 8 : PARTAGES RÉSEAU (SMB)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ PASS - SMBv1 DÉSACTIVÉ (CRITIQUE)
+✅ PASS - SMB Signing requis
+⚠️  WARN - Chiffrement SMB3 activé
+❌ FAIL - Aucun partage avec 'Everyone : Full'
+
+[...]
+
+═══════════════════════════════════════════════════════════════════
+📊 RÉSUMÉ DE L'AUDIT
+═══════════════════════════════════════════════════════════════════
+
+Total de vérifications    : 42
+✅ Réussies (PASS)        : 35
+⚠️  Avertissements (WARN) : 4
+❌ Échecs (FAIL)          : 3
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🎯 SCORE DE SÉCURITÉ : 83.3%
+📈 NIVEAU            : ✅ BON - Quelques améliorations possibles
+
+═══════════════════════════════════════════════════════════════════
+📝 Rapport complet sauvegardé dans :
+   .\audit-windows-server-20250116-143022.txt
+═══════════════════════════════════════════════════════════════════
+
+💡 RECOMMANDATIONS :
+
+1. Consulte le guide détaillé 'windows-server-2022.md'
+2. Priorise la correction des checks ❌ FAIL (surtout SEVERITY: HIGH)
+3. Reteste avec ce script après corrections
+4. Examine les checks ⚠️  WARN pour optimisation
+
+📚 Pour chaque check échoué, le guide 'windows-server-2022.md' contient :
+   - L'explication du risque
+   - Les commandes PowerShell de correction
+   - Des exemples concrets
+
+🎓 Bravo d'avoir audité ton serveur !
+   La sécurité, c'est un processus continu, pas une destination ! 🚀
+```
+
+---
+
+### 🎨 Interprétation des résultats
+
+**🏆 Score >= 90% - EXCELLENT**
+- Ton serveur est très sécurisé !
+- Continue la maintenance régulière
+- Refais un audit après chaque changement majeur
+
+**✅ Score 75-89% - BON**
+- Quelques points à améliorer
+- Consulte les checks ❌ FAIL et ⚠️ WARN
+- Corrige au minimum les HIGH severity
+
+**⚠️ Score 60-74% - MOYEN**
+- Plusieurs problèmes de sécurité
+- **Action requise** : Corrige tous les FAIL
+- Priorise les HIGH, puis MEDIUM
+
+**🟠 Score 40-59% - FAIBLE**
+- Nombreux problèmes critiques
+- **URGENT** : Serveur vulnérable
+- Planifie une journée de durcissement
+
+**🔴 Score < 40% - CRITIQUE**
+- Serveur **TRÈS vulnérable**
+- **ALERTE MAXIMALE**
+- Envisage une réinstallation propre avec application du guide dès le départ
+
+---
+
+### 📅 Quand relancer le script ?
+
+**Fréquence recommandée** :
+
+| Environnement | Fréquence | Raison |
+|---------------|-----------|--------|
+| Serveur de production critique | **Hebdomadaire** | Détection rapide de dérives de configuration |
+| Serveur de production standard | **Mensuel** | Audit régulier, conformité |
+| Serveur de test/dev | **Trimestriel** | Avant mise en production |
+| Après chaque changement majeur | **Immédiat** | Vérifier qu'aucune régression de sécurité |
+| Après installation de nouvelles applications | **Immédiat** | S'assurer que l'app n'a pas affaibli la sécu |
+
+**Automatisation avancée (optionnel)** :
+
+Tu peux planifier l'exécution automatique du script avec le **Planificateur de tâches Windows** :
+
+```powershell
+# Créer une tâche planifiée (exemple : tous les lundis à 9h)
+$action = New-ScheduledTaskAction -Execute "PowerShell.exe" -Argument "-ExecutionPolicy Bypass -File C:\Scripts\audit-windows-server-2022.ps1"
+$trigger = New-ScheduledTaskTrigger -Weekly -DaysOfWeek Monday -At 9am
+$principal = New-ScheduledTaskPrincipal -UserId "SYSTEM" -LogonType ServiceAccount -RunLevel Highest
+Register-ScheduledTask -TaskName "Audit Sécurité Hebdomadaire" -Action $action -Trigger $trigger -Principal $principal -Description "Audit automatique de sécurité Windows Server 2022"
+```
+
+---
+
+### 💾 Sauvegarder les rapports
+
+**Conseil professionnel** : Archive tous tes rapports d'audit !
+
+**Pourquoi ?**
+- Traçabilité : Prouver que tu fais des audits réguliers (conformité, assurance, audit externe)
+- Comparaison : Voir l'évolution du score dans le temps
+- Incident : En cas d'intrusion, comparer l'état avant/après
+
+**Exemple d'organisation** :
+
+```
+C:\Audits\
+├── 2025-01\
+│   ├── audit-windows-server-20250106-090000.txt
+│   ├── audit-windows-server-20250113-090000.txt
+│   └── audit-windows-server-20250120-090000.txt
+├── 2025-02\
+│   ├── audit-windows-server-20250203-090000.txt
+│   └── audit-windows-server-20250210-090000.txt
+└── historique-scores.csv
+```
+
+**Script pour générer un historique CSV** :
+
+```powershell
+# Ajouter cette ligne à la fin de chaque audit
+$csvLine = "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss'),$scorePercentage,$script:PassedChecks,$script:FailedChecks,$script:WarningChecks"
+Add-Content -Path "C:\Audits\historique-scores.csv" -Value $csvLine
+```
+
+Ensuite, tu peux ouvrir `historique-scores.csv` dans Excel et créer un **graphique d'évolution** de ton score ! 📈
+
+---
+
+### 🔧 Personnaliser le script
+
+Le script est conçu pour être **facilement personnalisable**.
+
+**Exemples de personnalisations** :
+
+**1. Ajouter tes propres checks**
+
+```powershell
+# Ajouter après la Partie 10
+Invoke-Check -Name "Mon application critique est installée" -Severity "HIGH" -Expected "Service MyApp = Running" -Check {
+    $myApp = Get-Service -Name "MyApp" -ErrorAction SilentlyContinue
+    if ($myApp -and $myApp.Status -eq 'Running') { return $true } else { return $false }
+}
+```
+
+**2. Modifier les seuils**
+
+Par exemple, tu veux exiger des signatures antivirus à jour depuis moins de **3 jours** au lieu de 7 :
+
+```powershell
+# Ligne originale (dans le script) :
+if ($daysSinceUpdate.Days -le 7) { return $true } else { return $false }
+
+# Modifier en :
+if ($daysSinceUpdate.Days -le 3) { return $true } else { return $false }
+```
+
+**3. Envoyer le rapport par email**
+
+```powershell
+# À ajouter à la fin du script (nécessite configuration SMTP)
+$emailParams = @{
+    From = "audit@monentreprise.com"
+    To = "admin@monentreprise.com"
+    Subject = "Audit Sécurité Windows Server - Score: $scorePercentage%"
+    Body = Get-Content -Path $OutputFile -Raw
+    SmtpServer = "smtp.monentreprise.com"
+    Port = 587
+    UseSsl = $true
+    Credential = (Get-Credential)
+}
+Send-MailMessage @emailParams
+```
+
+---
+
+## ✅ Checklist Finale Complète
+
+Voici la **checklist ultime** pour un Windows Server 2022 sécurisé selon le **CIS Benchmark v4.0.0** et les recommandations **ANSSI** :
+
+### 📦 Partie 1 : Mises à Jour
+
+- [ ] Windows Update configuré en mode automatique ou manuel contrôlé
+- [ ] Mises à jour installées dans les **30 derniers jours**
+- [ ] Mises à jour **critiques** installées dans les **7 jours** après publication
+- [ ] Service wuauserv démarré
+- [ ] Redémarrages planifiés après mises à jour (hors heures de production)
+- [ ] Sauvegarde complète AVANT installation de mises à jour majeures
+
+### 👤 Partie 2 : Comptes Utilisateurs
+
+- [ ] Longueur minimale mot de passe : **14 caractères minimum** (idéalement 16+)
+- [ ] Complexité des mots de passe : **Activée**
+- [ ] Historique des mots de passe : **24 mots de passe mémorisés**
+- [ ] Âge maximum du mot de passe : **60 jours** (ou selon politique entreprise)
+- [ ] Seuil de verrouillage de compte : **5 tentatives maximum**
+- [ ] Durée de verrouillage : **15 minutes minimum**
+- [ ] Compte **Guest** : **DÉSACTIVÉ**
+- [ ] Compte **Administrator** : **Renommé ET désactivé** (ou au minimum renommé)
+- [ ] Honeypot Administrator créé (optionnel mais recommandé)
+- [ ] Inventaire des comptes locaux réalisé et documenté
+- [ ] Aucun compte avec mot de passe vide
+- [ ] Aucun compte inactif depuis plus de 90 jours
+
+### 🖥️ Partie 3 : RDP (Remote Desktop)
+
+- [ ] RDP **désactivé** si non nécessaire (idéal)
+- [ ] Si RDP activé : **NLA (Network Level Authentication) = Activé**
+- [ ] Niveau de chiffrement : **Élevé (128-bit minimum)**
+- [ ] SSL/TLS : **Forcé** (SecurityLayer = 2)
+- [ ] Restriction par IP : **Configurée** (limiter aux IP d'administration)
+- [ ] Port RDP **modifié** (optionnel, débat sécurité vs obscurité)
+- [ ] Timeout de session inactive : **15 minutes maximum**
+- [ ] Déconnexion automatique après timeout
+- [ ] Journalisation des connexions RDP activée
+- [ ] Surveillance des tentatives de connexion échouées (brute-force)
+
+### 🔥 Partie 4 : Pare-feu Windows Defender
+
+- [ ] Pare-feu activé sur profil **Domain** : **✅**
+- [ ] Pare-feu activé sur profil **Private** : **✅**
+- [ ] Pare-feu activé sur profil **Public** : **✅**
+- [ ] Politique par défaut **Inbound** : **Block**
+- [ ] Politique par défaut **Outbound** : **Allow** (ou Block si environnement très contrôlé)
+- [ ] Inventaire des règles Inbound actives réalisé
+- [ ] Aucune règle "Any/Any" dangereuse
+- [ ] Règles de partage de fichiers désactivées si non nécessaires
+- [ ] Règles de découverte réseau désactivées sur profil Public
+- [ ] Journalisation du pare-feu activée (connexions refusées + autorisées)
+- [ ] Révision trimestrielle des règles
+
+### 🛡️ Partie 5 : Windows Defender Antivirus
+
+- [ ] Windows Defender **activé** (ou autre antivirus tiers réputé)
+- [ ] Protection en temps réel : **Activée**
+- [ ] Behavior Monitoring : **Activé**
+- [ ] IOAV Protection : **Activé**
+- [ ] Signatures antivirus **à jour** (< 7 jours)
+- [ ] Cloud Protection (MAPS) : **Advanced** (niveau 2)
+- [ ] Soumission automatique d'échantillons : **Activée**
+- [ ] Exclusions auditées : **AUCUNE exclusion dangereuse** (C:\, *.exe, etc.)
+- [ ] Scan complet programmé : **Hebdomadaire**
+- [ ] Historique des détections consulté régulièrement
+- [ ] Réponse automatique aux menaces : **Configurée** (quarantaine/suppression)
+
+### 📊 Partie 6 : Audit et Journalisation
+
+- [ ] Politique d'audit avancée configurée (auditpol)
+- [ ] Audit Logon/Logoff : **Success + Failure**
+- [ ] Audit Account Lockout : **Failure**
+- [ ] Audit User Account Management : **Success + Failure**
+- [ ] Audit Security Group Management : **Success**
+- [ ] Audit Policy Change : **Success**
+- [ ] Taille du journal Security : **≥ 512 MB** (idéalement 1 GB)
+- [ ] Rétention des logs : **Au moins 90 jours**
+- [ ] Surveillance des Event IDs critiques :
+  - [ ] 4624 (Connexion réussie)
+  - [ ] 4625 (Connexion échouée)
+  - [ ] 4720 (Création de compte)
+  - [ ] 4726 (Suppression de compte)
+  - [ ] 4732 (Ajout à un groupe de sécurité)
+  - [ ] 4776 (Validation de credentials)
+- [ ] Centralisation des logs (SIEM, Syslog) : **Recommandée**
+- [ ] Alertes configurées pour tentatives d'intrusion
+
+### 🛠️ Partie 7 : Services Windows
+
+- [ ] Inventaire des services en cours d'exécution réalisé
+- [ ] **Print Spooler** : **DÉSACTIVÉ** (si pas d'imprimantes)
+- [ ] **Remote Registry** : **DÉSACTIVÉ**
+- [ ] **SNMP** : **DÉSACTIVÉ** ou **supprimé**
+- [ ] **Computer Browser** : **DÉSACTIVÉ**
+- [ ] **SSDP Discovery** : **DÉSACTIVÉ**
+- [ ] **Bluetooth Support** : **DÉSACTIVÉ**
+- [ ] Aucun service avec compte **Administrator** ou **Domain Admin**
+- [ ] Services tiers : Comptes de service dédiés à droits minimaux
+- [ ] Documentation des services nécessaires et justification
+- [ ] Révision trimestrielle de la liste des services actifs
+
+### 🌐 Partie 8 : Partages Réseau (SMB)
+
+- [ ] Inventaire des partages réseau réalisé
+- [ ] Partages inutiles supprimés
+- [ ] **AUCUN partage avec "Everyone : Full"**
+- [ ] Partages de sauvegardes : **Accès limité aux comptes de service uniquement**
+- [ ] **SMBv1** : **COMPLÈTEMENT DÉSACTIVÉ** 🔴 (CRITIQUE)
+- [ ] SMB Signing : **Activé ET Obligatoire**
+  - [ ] EnableSecuritySignature = True
+  - [ ] RequireSecuritySignature = True
+- [ ] Chiffrement SMB3 : **Activé** (au moins sur partages sensibles)
+- [ ] Partages administratifs (C$, ADMIN$) : **Accès restreint aux admins uniquement**
+- [ ] Documentation des partages légitimes et permissions
+- [ ] Révision trimestrielle des partages et permissions
+
+### 🛡️ Partie 9 : User Account Control (UAC)
+
+- [ ] UAC **activé** (EnableLUA = 1)
+- [ ] Prompt de consentement pour admins : **Activé** (ConsentPromptBehaviorAdmin ≥ 2)
+- [ ] Bureau sécurisé : **Activé** (PromptOnSecureDesktop = 1)
+- [ ] Prompt pour utilisateurs standard : **Configuré** (ConsentPromptBehaviorUser = 1)
+- [ ] Validation des signatures : **Considérée** pour environnements critiques
+- [ ] Surveillance des modifications UAC (Event IDs 4719, 4657)
+- [ ] Aucune exception UAC pour applications non fiables
+- [ ] Documentation si UAC abaissé (avec justification)
+
+### 🌍 Partie 10 : Sécurité Réseau et Protocoles
+
+- [ ] **LmCompatibilityLevel = 5** (NTLMv2 uniquement, refuse LM/NTLM)
+- [ ] Hash LM **désactivés** (NoLMHash = 1)
+- [ ] Audit NTLM **activé** pour identifier les dépendances
+- [ ] Plan de migration de NTLM vers Kerberos en cours
+- [ ] Signature LDAP **activée** (serveur + client)
+- [ ] Kerberos : **Uniquement AES-128 + AES-256** (SupportedEncryptionTypes = 24)
+- [ ] DES et RC4 **désactivés** pour Kerberos
+- [ ] Surveillance des authentifications NTLM (Event ID 8004)
+- [ ] Documentation des systèmes nécessitant encore NTLM
+- [ ] Tests de compatibilité avant blocage complet NTLM
+
+### 🔒 Sécurité Additionnelle (Bonus)
+
+- [ ] **BitLocker** activé sur tous les volumes (chiffrement disque complet)
+- [ ] **AppLocker** ou **Windows Defender Application Control** configuré
+- [ ] Sauvegarde **3-2-1** en place :
+  - [ ] 3 copies des données
+  - [ ] 2 types de supports différents
+  - [ ] 1 copie hors site (offsite/cloud)
+- [ ] Sauvegarde testée régulièrement (exercice de restauration)
+- [ ] Plan de reprise d'activité (PRA) documenté
+- [ ] Segmentation réseau (VLAN) : Serveurs isolés des postes de travail
+- [ ] Antivirus sur les sauvegardes (scanner les backups)
+- [ ] Monitoring et alertes (CPU, RAM, disque, réseau)
+- [ ] Inventaire matériel et logiciel à jour
+- [ ] Documentation complète (architecture, procédures, contacts)
+
+---
+
+## 🎓 Conclusion : De Zéro à Héros ! 🏆
+
+### 🚀 Le Chemin Parcouru
+
+**Félicitations** ! 🎉
+
+Si tu es arrivé·e jusqu'ici, tu as parcouru un **voyage extraordinaire** :
+
+1. **Tu es parti·e de zéro** : Peut-être que tu ne savais même pas ce qu'était PowerShell, SMB, ou UAC
+2. **Tu as appris les concepts** : Avec des analogies simples (coffres-forts, gardes royaux, sceau de cire...)
+3. **Tu as compris les risques** : WannaCry, PrintNightmare, EternalBlue ne sont plus de simples noms, mais des menaces réelles que tu sais prévenir
+4. **Tu as appliqué les corrections** : Commande par commande, vérification par vérification
+5. **Tu es devenu·e un·e HÉROS de la sécurité Windows** ! 🦸‍♂️🦸‍♀️
+
+### 📊 Rappel des Statistiques Impressionnantes
+
+Grâce à ce guide, tu sais maintenant **prévenir** :
+
+- **WannaCry** (2017) : 200 000+ victimes, 4 milliards $ de dégâts → **Tu sais désactiver SMBv1** ✅
+- **NotPetya** (2017) : 10 milliards $ de dégâts → **Tu sais sécuriser SMB** ✅
+- **PrintNightmare** (2021) : Millions de serveurs compromis → **Tu sais désactiver Print Spooler** ✅
+- **Colonial Pipeline** (2021) : Pipeline d'essence paralysé → **Tu sais sécuriser les sauvegardes et RDP** ✅
+- **90% des ransomwares** via RDP mal sécurisé → **Tu sais activer NLA, SSL/TLS, et restreindre par IP** ✅
+
+**En d'autres termes** : Grâce à ce guide, tu as acquis les compétences pour **protéger ton organisation contre des milliards de dollars de dégâts potentiels** ! 💰🛡️
+
+### 🌟 Ce que tu maîtrises maintenant
+
+#### 🎯 Compétences Techniques
+
+- ✅ **PowerShell** : Tu sais utiliser Get-Service, Get-ItemProperty, Set-ItemProperty, auditpol, etc.
+- ✅ **Registre Windows** : Tu comprends HKLM, les clés de sécurité, et comment les modifier
+- ✅ **Gestion des services** : Start, Stop, Disable, analyse des comptes de service
+- ✅ **Pare-feu Windows** : Profils, règles, Get-NetFirewallRule, New-NetFirewallRule
+- ✅ **SMB/CIFS** : Versions (SMBv1 vs SMB3), signature, chiffrement, permissions
+- ✅ **Audit et logs** : Event Viewer, Event IDs, Get-WinEvent, filtres XML
+- ✅ **Authentification** : LM, NTLM, NTLMv2, Kerberos, AES, Pass-the-Hash
+- ✅ **UAC** : Niveaux, bureau sécurisé, validation de signatures
+- ✅ **RDP** : NLA, chiffrement, SecurityLayer, restrictions IP
+
+#### 🧠 Compétences Conceptuelles
+
+- ✅ **Principe du moindre privilège** : Chaque compte/service a uniquement les droits nécessaires
+- ✅ **Défense en profondeur** : Plusieurs couches de sécurité (pare-feu + antivirus + UAC + audit...)
+- ✅ **Deny by default, allow by exception** : Bloquer tout par défaut, autoriser uniquement ce qui est nécessaire
+- ✅ **Surface d'attaque** : Moins de services = moins de portes d'entrée pour les hackers
+- ✅ **Gestion des risques** : Identifier, évaluer, mitiger
+- ✅ **Conformité** : CIS Benchmark, ANSSI, Microsoft Security Baseline
+
+#### 🔧 Compétences Pratiques
+
+- ✅ **Auditer** un serveur Windows complet (manuellement ET avec script automatisé)
+- ✅ **Interpréter** les résultats d'audit et prioriser les corrections
+- ✅ **Durcir** (harden) un serveur selon les standards de l'industrie
+- ✅ **Automatiser** des tâches de sécurité avec PowerShell
+- ✅ **Documenter** les configurations et justifier les choix
+- ✅ **Communiquer** les risques de sécurité à des non-techniques (grâce aux analogies !)
+
+### 💼 Valeur Professionnelle
+
+**Sur le marché du travail**, ces compétences sont **TRÈS recherchées** :
+
+- **Administrateur Système Windows** : Salaire moyen 45K-65K€/an
+- **Ingénieur Sécurité** : Salaire moyen 50K-80K€/an
+- **Auditeur Sécurité** : Salaire moyen 45K-70K€/an
+- **Consultant Cybersécurité** : Salaire moyen 55K-90K€/an
+
+**Certifications complémentaires** que tu peux maintenant viser :
+
+- **CompTIA Security+** : Certification sécurité reconnue mondialement
+- **Microsoft Certified: Security, Compliance, and Identity Fundamentals** (SC-900)
+- **Microsoft Certified: Windows Server Hybrid Administrator Associate** (AZ-800 + AZ-801)
+- **CIS Hardening Specialist**
+- **CISSP** (Certified Information Systems Security Professional) - niveau avancé
+
+### 🎯 Et Maintenant ?
+
+**La sécurité n'est PAS une destination, c'est un VOYAGE** ! 🛤️
+
+**1. Applique ce que tu as appris**
+
+- Prends un serveur de test
+- Applique chaque vérification du guide
+- Lance le script d'audit
+- Vise un score de 90%+
+
+**2. Pratique régulièrement**
+
+- Refais un audit mensuel
+- Teste de nouvelles configurations
+- Reste curieux·se !
+
+**3. Reste à jour**
+
+- Suis les blogs Microsoft Security
+- Consulte régulièrement le CIS Benchmark (mis à jour annuellement)
+- Lis les advisories de sécurité (CVE)
+- Rejoins des communautés (r/sysadmin, r/cybersecurity)
+
+**4. Partage tes connaissances**
+
+- Forme tes collègues
+- Écris de la documentation pour ton entreprise
+- Contribue à des projets open-source
+- Deviens mentor·e pour d'autres débutant·e·s
+
+**5. Continue d'apprendre**
+
+- Explore **Active Directory** (GPO, domaines, forêts)
+- Apprends **PowerShell scripting avancé** (modules, DSC)
+- Découvre **Azure** et le cloud security
+- Penche-toi sur **incident response** et **forensics**
+
+### 🌈 Message Final
+
+**Tu n'es plus un·e débutant·e** ! 🎓
+
+Grâce à ce guide, tu es passé·e de "Je ne sais pas ce qu'est PowerShell" à "Je peux auditer et sécuriser un serveur Windows Server 2022 selon les standards de l'industrie".
+
+**C'est ÉNORME** ! 🚀
+
+Chaque serveur que tu sécurises, c'est :
+- Des **données personnelles protégées** 🔐
+- Des **entreprises sauvées** d'une paralysie ransomware 🏥
+- Des **vies numériques préservées** 👨‍👩‍👧‍👦
+- De la **confiance restaurée** dans les systèmes informatiques 🤝
+
+**Tu as le pouvoir de faire une vraie différence** ! 💪
+
+### 🙏 Remerciements
+
+Merci d'avoir lu ce guide jusqu'au bout.
+
+Merci de prendre la sécurité au sérieux.
+
+Merci de vouloir faire mieux.
+
+**Le monde numérique a besoin de héros comme toi** ! 🦸‍♂️🦸‍♀️
+
+### 🚀 Maintenant, vas-y et SÉCURISE CE SERVEUR ! 🛡️
+
+---
+
+**🎯 Score final : 🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟 + 🏆 LÉGENDE ABSOLUE ! 🏆**
+
+---
+
+**Fait avec ❤️ pour les futurs expert·e·s en sécurité Windows**
+
+*Version 2.0 - Style "From Zero to Hero" - 2025*
+
+---

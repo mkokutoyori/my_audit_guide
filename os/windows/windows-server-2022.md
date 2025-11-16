@@ -2070,17 +2070,1472 @@ TimeCreated   Account      SourceIP        FailureReason
 
 ---
 
-*[Guide Windows Server 2022 - Parties 7-10 + Script + Conclusion à venir]*
+## 🛠️ Partie 7 : Services Windows - La Chasse aux Portes Dérobées
 
-**Parties suivantes :**
-- Partie 7 : Services Windows
-- Partie 8 : Partages Réseau (SMB)
-- Partie 9 : User Account Control (UAC)
-- Partie 10 : Sécurité Réseau et Protocoles
-- Script d'Audit Automatisé v2.0
-- Checklist Finale Complète
-- Conclusion : De Zéro à Héros !
+### 🎯 Concept : Les services, c'est quoi ?
+
+Imagine ton serveur comme un immeuble. Les **services** sont les boutiques ouvertes 24/7 au rez-de-chaussée : imprimerie, accueil, surveillance, maintenance, etc.
+
+**Le problème** : Plus tu as de boutiques ouvertes, plus tu offres de points d'entrée aux cambrioleurs ! 🚪🚪🚪
+
+**En sécurité** :
+- **Moins de services = Moins de surface d'attaque**
+- Chaque service qui tourne est une cible potentielle
+- Certains services ont des failles connues (PrintNightmare = 💥)
+
+### 📊 Quelques statistiques qui font réfléchir
+
+- **Print Spooler** (service d'impression) : Responsable de **PrintNightmare** (CVE-2021-34527), une faille critique qui a permis à des hackers de prendre le contrôle total de millions de serveurs Windows en 2021
+- **Remote Registry** : Utilisé dans **90% des attaques par ransomware** pour modifier la configuration à distance
+- **SNMP** : Protocole ancien qui envoie les mots de passe en **clair** sur le réseau
+- Selon le **CIS Benchmark** : Un serveur Windows avec configuration par défaut a environ **180 services installés**, mais seulement **60-80 sont réellement nécessaires** pour un serveur web ou applicatif
+
+**Exemples d'attaques réelles** :
+- **PrintNightmare (2021)** : Exploitation du service Print Spooler → Exécution de code à distance → Prise de contrôle totale
+- **EternalBlue (2017)** : Exploitation du service SMBv1 → WannaCry → 200 000+ ordinateurs infectés → 4 milliards de dollars de dégâts
+
+### 🔍 Vérification 1 : Inventaire des services en cours d'exécution
+
+**Commande** :
+
+```powershell
+Get-Service | Where-Object {$_.Status -eq 'Running'} | Select-Object Name, DisplayName, StartType | Sort-Object DisplayName | Format-Table -AutoSize
+```
+
+**Décortiquons la commande** :
+
+| Partie de la commande | Signification |
+|----------------------|---------------|
+| `Get-Service` | Liste **tous** les services Windows (démarrés ou arrêtés) |
+| `Where-Object {$_.Status -eq 'Running'}` | Filtre pour ne garder que ceux qui tournent **actuellement** |
+| `Select-Object Name, DisplayName, StartType` | Affiche le nom technique, le nom affiché, et le type de démarrage |
+| `Sort-Object DisplayName` | Trie par ordre alphabétique du nom affiché |
+| `Format-Table -AutoSize` | Affichage en tableau avec colonnes ajustées automatiquement |
+
+**Exemple de résultat** :
+
+```
+Name                          DisplayName                                    StartType
+----                          -----------                                    ---------
+AdobeARMservice               Adobe Acrobat Update Service                   Automatic
+Appinfo                       Application Information                        Manual
+AudioEndpointBuilder          Windows Audio Endpoint Builder                 Automatic
+Audiosrv                      Windows Audio                                  Automatic
+BFE                           Base Filtering Engine                          Automatic
+BITS                          Background Intelligent Transfer Service        Manual
+Browser                       Computer Browser                               Manual
+CertPropSvc                   Certificate Propagation                        Manual
+CryptSvc                      Cryptographic Services                         Automatic
+DcomLaunch                    DCOM Server Process Launcher                   Automatic
+Dhcp                          DHCP Client                                    Automatic
+Dnscache                      DNS Client                                     Automatic
+eventlog                      Windows Event Log                              Automatic
+EventSystem                   COM+ Event System                              Automatic
+FontCache                     Windows Font Cache Service                     Automatic
+gpsvc                         Group Policy Client                            Automatic
+IKEEXT                        IKE and AuthIP IPsec Keying Modules           Automatic
+iphlpsvc                      IP Helper                                      Automatic
+LanmanServer                  Server                                         Automatic
+LanmanWorkstation             Workstation                                    Automatic
+lmhosts                       TCP/IP NetBIOS Helper                         Manual
+mpssvc                        Windows Defender Firewall                      Automatic
+MpsSvc                        Windows Firewall                               Automatic
+MSDTC                         Distributed Transaction Coordinator            Automatic
+msiserver                     Windows Installer                              Manual
+NetTcpPortSharing             Net.Tcp Port Sharing Service                   Disabled
+Netlogon                      Netlogon                                       Automatic
+Netman                        Network Connections                            Manual
+nsi                           Network Store Interface Service                Automatic
+PlugPlay                      Plug and Play                                  Automatic
+PolicyAgent                   IPsec Policy Agent                            Manual
+Power                         Power                                          Automatic
+ProfSvc                       User Profile Service                           Automatic
+RpcEptMapper                  RPC Endpoint Mapper                           Automatic
+RpcSs                         Remote Procedure Call (RPC)                    Automatic
+SamSs                         Security Accounts Manager                      Automatic
+Schedule                      Task Scheduler                                 Automatic
+seclogon                      Secondary Logon                                Manual
+SENS                          System Event Notification Service              Automatic
+SessionEnv                    Remote Desktop Configuration                   Manual
+SharedAccess                  Internet Connection Sharing (ICS)              Disabled
+ShellHWDetection              Shell Hardware Detection                       Automatic
+Spooler                       Print Spooler                                  Automatic
+SSDPSRV                       SSDP Discovery                                Manual
+SstpSvc                       Secure Socket Tunneling Protocol Service       Manual
+SysMain                       Superfetch                                     Automatic
+TabletInputService            Tablet PC Input Service                        Disabled
+TapiSrv                       Telephony                                      Manual
+TermService                   Remote Desktop Services                        Manual
+Themes                        Themes                                         Automatic
+TrkWks                        Distributed Link Tracking Client              Automatic
+TrustedInstaller              Windows Modules Installer                      Manual
+UI0Detect                     Interactive Services Detection                 Manual
+UmRdpService                  Remote Desktop Services UserMode Port Redirector Manual
+UxSms                         Desktop Window Manager Session Manager         Automatic
+VaultSvc                      Credential Manager                            Manual
+vds                           Virtual Disk                                   Manual
+VSS                           Volume Shadow Copy                             Manual
+W32Time                       Windows Time                                   Automatic
+Wcmsvc                        Windows Connection Manager                     Automatic
+WdiServiceHost                Diagnostic Service Host                        Manual
+WdiSystemHost                 Diagnostic System Host                         Manual
+WinDefend                     Windows Defender Antivirus Service            Automatic
+Wecsvc                        Windows Event Collector                        Manual
+WinHttpAutoProxySvc           WinHTTP Web Proxy Auto-Discovery Service      Manual
+Winmgmt                       Windows Management Instrumentation            Automatic
+WinRM                         Windows Remote Management (WS-Management)      Automatic
+Wlansvc                       WLAN AutoConfig                               Manual
+wmiApSrv                      WMI Performance Adapter                       Manual
+WPDBusEnum                    Portable Device Enumerator Service            Manual
+wscsvc                        Security Center                                Automatic
+wuauserv                      Windows Update                                 Manual
+wudfsvc                       Windows Driver Foundation - User-mode Driver Framework Manual
+```
+
+**Analyse de ce résultat** :
+
+Sur ce serveur, on voit **70+ services en cours d'exécution**. C'est beaucoup ! Regardons les suspects :
+
+| Service | Nom Technique | Problème Potentiel | Risque |
+|---------|--------------|-------------------|--------|
+| Print Spooler | `Spooler` | PrintNightmare (CVE-2021-34527) - RCE | 🔴 **CRITIQUE** |
+| Computer Browser | `Browser` | Obsolète depuis Windows 10, failles connues | 🟠 **ÉLEVÉ** |
+| Remote Registry | `RemoteRegistry` | Permet modification registre à distance | 🔴 **CRITIQUE** |
+| SSDP Discovery | `SSDPSRV` | Utilisé pour UPnP, souvent exploité | 🟠 **ÉLEVÉ** |
+| Bluetooth Support Service | `bthserv` | Sur un serveur ?? Aucune utilité | 🟡 **MOYEN** |
+| Interactive Services Detection | `UI0Detect` | Ancien mécanisme, rarement nécessaire | 🟡 **MOYEN** |
+
+### 🎯 Vérification 2 : Services dangereux à désactiver
+
+Voici une liste des services souvent **inutiles** sur un serveur et qui représentent des **risques de sécurité** :
+
+**Commande pour vérifier un service spécifique** :
+
+```powershell
+Get-Service -Name "Spooler" | Select-Object Name, DisplayName, Status, StartType
+```
+
+#### 🔴 Services CRITIQUES à désactiver
+
+**1. Print Spooler (Spooler)** - PrintNightmare
+
+```powershell
+# Vérifier
+Get-Service -Name "Spooler"
+
+# Si Status = Running et que tu n'as PAS besoin d'imprimantes :
+Stop-Service -Name "Spooler" -Force
+Set-Service -Name "Spooler" -StartupType Disabled
+```
+
+**Pourquoi ?**
+- **PrintNightmare** : Faille critique permettant l'exécution de code à distance
+- Microsoft a publié des correctifs, MAIS de nouvelles variantes continuent d'apparaître
+- Si ton serveur n'imprime pas = **AUCUNE raison de laisser ce service actif**
+
+**Scénario ✅ BON** :
+```
+Name     : Spooler
+Status   : Stopped
+StartType: Disabled
+```
+👉 Print Spooler désactivé, serveur protégé contre PrintNightmare !
+
+**Scénario ❌ DANGER** :
+```
+Name     : Spooler
+Status   : Running
+StartType: Automatic
+```
+👉 Print Spooler actif sur un serveur web qui n'imprime jamais = Surface d'attaque inutile !
 
 ---
 
-*Transformation en cours... Les dernières parties arrivent bientôt !*
+**2. Remote Registry (RemoteRegistry)**
+
+```powershell
+# Vérifier
+Get-Service -Name "RemoteRegistry"
+
+# Désactiver (sauf cas très spécifique)
+Stop-Service -Name "RemoteRegistry" -Force
+Set-Service -Name "RemoteRegistry" -StartupType Disabled
+```
+
+**Pourquoi ?**
+- Permet de modifier le **registre Windows** (configuration système) **à distance**
+- Utilisé par les ransomwares pour désactiver l'antivirus, créer des comptes, etc.
+- **99% des serveurs n'en ont PAS besoin**
+
+**Scénario ✅ BON** :
+```
+Name     : RemoteRegistry
+Status   : Stopped
+StartType: Disabled
+```
+
+**Scénario ❌ DANGER** :
+```
+Name     : RemoteRegistry
+Status   : Running
+StartType: Automatic
+```
+
+---
+
+**3. SNMP Service (SNMP)** - Si présent
+
+```powershell
+# Vérifier (peut ne pas être installé)
+Get-Service -Name "SNMP" -ErrorAction SilentlyContinue
+
+# Si présent et inutile :
+Stop-Service -Name "SNMP" -Force
+Set-Service -Name "SNMP" -StartupType Disabled
+```
+
+**Pourquoi ?**
+- Protocole de monitoring **très ancien** (années 1990)
+- Version SNMPv1 et v2 : Mots de passe ("community strings") envoyés en **clair**
+- Si tu as besoin de monitoring : Utilise des outils modernes (Prometheus, Zabbix, etc.)
+
+---
+
+#### 🟠 Services à examiner (selon ton usage)
+
+**4. Computer Browser (Browser)**
+
+```powershell
+Get-Service -Name "Browser" -ErrorAction SilentlyContinue
+Stop-Service -Name "Browser" -Force
+Set-Service -Name "Browser" -StartupType Disabled
+```
+
+**Pourquoi ?**
+- Obsolète depuis Windows 10
+- Sert à "parcourir le voisinage réseau" (fonctionnalité des années 2000)
+- Failles de sécurité connues
+
+---
+
+**5. SSDP Discovery (SSDPSRV)** - UPnP
+
+```powershell
+Get-Service -Name "SSDPSRV"
+Stop-Service -Name "SSDPSRV" -Force
+Set-Service -Name "SSDPSRV" -StartupType Disabled
+```
+
+**Pourquoi ?**
+- Utilisé pour la découverte automatique de périphériques (imprimantes, TV, etc.)
+- Protocole **UPnP** : Historiquement très vulnérable
+- Sur un serveur : Aucune utilité
+
+---
+
+**6. Bluetooth Support Service (bthserv)** - Si présent
+
+```powershell
+Get-Service -Name "bthserv" -ErrorAction SilentlyContinue
+Stop-Service -Name "bthserv" -Force
+Set-Service -Name "bthserv" -StartupType Disabled
+```
+
+**Pourquoi ?**
+- Bluetooth sur un serveur ? 🤔
+- Vecteur d'attaque supplémentaire (BlueBorne, etc.)
+
+---
+
+### 🔍 Vérification 3 : Services avec comptes à privilèges
+
+**Le risque** : Un service qui tourne avec un compte **Domain Admin** ou **Administrateur local**, c'est une **catastrophe** en attente !
+
+**Pourquoi ?**
+- Si le service est compromis, l'attaquant hérite des privilèges du compte
+- **Principe du moindre privilège** : Chaque service doit avoir **uniquement** les droits nécessaires
+
+**Commande pour auditer** :
+
+```powershell
+Get-WmiObject Win32_Service | Where-Object {$_.StartMode -eq "Auto" -or $_.State -eq "Running"} | Select-Object Name, DisplayName, StartName, State | Format-Table -AutoSize
+```
+
+**Décortiquons** :
+
+| Partie | Explication |
+|--------|-------------|
+| `Get-WmiObject Win32_Service` | Récupère TOUS les services via WMI (Windows Management Instrumentation) |
+| `Where-Object {$_.StartMode -eq "Auto" -or $_.State -eq "Running"}` | Filtre : Démarrage automatique OU actuellement en cours d'exécution |
+| `Select-Object Name, DisplayName, StartName, State` | Affiche : Nom technique, nom affiché, **compte utilisé**, état |
+| `StartName` | 👈 **C'est LE champ critique** : Quel compte exécute ce service ? |
+
+**Exemple de résultat** :
+
+```
+Name               DisplayName                                StartName                      State
+----               -----------                                ---------                      -----
+AdobeARMservice    Adobe Acrobat Update Service               LocalSystem                    Running
+Appinfo            Application Information                    LocalSystem                    Stopped
+BITS               Background Intelligent Transfer Service    LocalSystem                    Running
+CryptSvc           Cryptographic Services                     NT AUTHORITY\NetworkService    Running
+Dhcp               DHCP Client                                NT AUTHORITY\LocalService      Running
+Dnscache           DNS Client                                 NT AUTHORITY\NetworkService    Running
+eventlog           Windows Event Log                          NT AUTHORITY\LocalService      Running
+LanmanServer       Server                                     LocalSystem                    Running
+MSSQLSERVER        SQL Server (MSSQLSERVER)                   DOMAIN\sqlservice_account      Running
+MyAppService       Application Métier Critique                DOMAIN\Administrator           Running  ❌
+Spooler            Print Spooler                              LocalSystem                    Running
+W32Time            Windows Time                               NT AUTHORITY\LocalService      Running
+WinDefend          Windows Defender Antivirus Service         LocalSystem                    Running
+```
+
+**Analyse** :
+
+| Compte Utilisé | Niveau de Privilège | Utilisation Recommandée | Risque |
+|----------------|---------------------|------------------------|--------|
+| `LocalSystem` | **MAXIMUM** - Contrôle total du système | Services système Windows uniquement | 🔴 Si service tiers |
+| `NT AUTHORITY\NetworkService` | Moyen - Peut accéder au réseau | Services réseau Microsoft | 🟢 Acceptable |
+| `NT AUTHORITY\LocalService` | Faible - Accès local limité | Services locaux simples | ✅ Idéal |
+| `DOMAIN\Administrator` | **CATASTROPHIQUE** | **JAMAIS !** | 🔴🔴🔴 |
+| `DOMAIN\sqlservice_account` | Dépend des permissions du compte | Si compte dédié avec droits minimaux | 🟡 À vérifier |
+
+**🚨 PROBLÈME DÉTECTÉ** :
+```
+MyAppService    Application Métier Critique    DOMAIN\Administrator    Running
+```
+
+👉 Un service applicatif qui tourne avec le compte **Administrateur du domaine** !
+
+**Conséquences si ce service est compromis** :
+1. L'attaquant hérite des droits **Administrateur du domaine**
+2. Il peut créer des comptes, modifier les GPO, accéder à TOUS les serveurs du domaine
+3. C'est le **jackpot** pour un hacker 💰
+
+**Correction URGENTE** :
+
+```powershell
+# 1. Créer un compte de service dédié avec droits minimaux
+# (À faire dans Active Directory Users and Computers)
+# Exemple: DOMAIN\svc_myapp
+
+# 2. Modifier le service pour utiliser ce compte
+$service = Get-WmiObject Win32_Service -Filter "Name='MyAppService'"
+$service.Change($null,$null,$null,$null,$null,$null,"DOMAIN\svc_myapp","MotDePasseComplexe123!")
+
+# 3. Redémarrer le service
+Restart-Service -Name "MyAppService"
+
+# 4. Vérifier
+Get-WmiObject Win32_Service -Filter "Name='MyAppService'" | Select-Object Name, StartName
+```
+
+**Résultat attendu** :
+```
+Name          StartName
+----          ---------
+MyAppService  DOMAIN\svc_myapp
+```
+
+✅ Service désormais avec un compte dédié à droits limités !
+
+---
+
+### 📋 Récapitulatif : Services Windows
+
+**Checklist de sécurité** :
+
+- [ ] Inventaire des services en cours d'exécution réalisé
+- [ ] Print Spooler (Spooler) : **Désactivé** si pas d'imprimantes
+- [ ] Remote Registry : **Désactivé**
+- [ ] SNMP : **Désactivé** ou **supprimé**
+- [ ] Computer Browser : **Désactivé**
+- [ ] SSDP Discovery : **Désactivé**
+- [ ] Bluetooth : **Désactivé** sur serveur
+- [ ] Aucun service avec compte `Administrator` ou `Domain Admin`
+- [ ] Services tiers avec comptes de service dédiés à droits minimaux
+- [ ] Documentation des services nécessaires et justification
+- [ ] Révision trimestrielle de la liste des services actifs
+
+**🎓 Ce que tu maîtrises maintenant :**
+- ✅ Lister les services Windows en cours d'exécution
+- ✅ Identifier les services dangereux (Print Spooler, Remote Registry, SNMP)
+- ✅ Comprendre PrintNightmare et son impact
+- ✅ Désactiver proprement un service Windows
+- ✅ Auditer les comptes utilisés par les services
+- ✅ Appliquer le principe du moindre privilège aux services
+- ✅ Utiliser WMI pour récupérer des informations détaillées
+
+**Niveau actuel : 🌟🌟🌟🌟🌟🌟🌟 Expert Avancé !**
+
+---
+
+## 🌐 Partie 8 : Partages Réseau (SMB) - Verrouiller les Coffres-Forts
+
+### 🎯 Concept : SMB, c'est quoi ?
+
+**SMB** (Server Message Block) = Le protocole qui permet de **partager des fichiers et des imprimantes** entre ordinateurs Windows.
+
+**L'analogie** : Imagine SMB comme un système de **coffres-forts partagés** dans une banque.
+- Chaque coffre = Un partage réseau (`\\serveur\partage`)
+- Certains ont des **serrures solides** (SMB3 avec chiffrement)
+- D'autres ont des **serrures cassées** (SMBv1 = portes ouvertes !)
+
+### 📊 Statistiques qui font froid dans le dos
+
+- **SMBv1** : Protocole des années **1990**, plein de failles de sécurité
+- **EternalBlue** (2017) : Exploit SMBv1 utilisé par **WannaCry** → 200 000+ victimes → 4 milliards $ de dégâts
+- **NotPetya** (2017) : Ransomware via SMBv1 → 10 milliards $ de dégâts (Maersk, FedEx, Merck...)
+- Selon Microsoft : **SMBv1 devrait être supprimé depuis 2017**, mais encore présent sur 30% des serveurs Windows
+
+**Exemples d'attaques réelles** :
+- **WannaCry (2017)** : Exploit EternalBlue (SMBv1) → Hôpitaux paralysés, usines arrêtées
+- **NotPetya (2017)** : Propagation via SMBv1 → Pertes estimées à 10 milliards de dollars
+- **Emotet (2018-2021)** : Trojan se propageant via partages SMB mal sécurisés
+
+### 🔍 Vérification 1 : Inventaire des partages réseau
+
+**Commande** :
+
+```powershell
+Get-SmbShare | Select-Object Name, Path, Description, CurrentUsers | Format-Table -AutoSize
+```
+
+**Décortiquons** :
+
+| Partie | Explication |
+|--------|-------------|
+| `Get-SmbShare` | Liste **tous** les partages SMB sur le serveur |
+| `Select-Object Name, Path, Description, CurrentUsers` | Affiche : Nom du partage, chemin local, description, utilisateurs connectés |
+| `CurrentUsers` | Nombre d'utilisateurs **actuellement** connectés au partage |
+
+**Exemple de résultat** :
+
+```
+Name       Path                    Description                           CurrentUsers
+----       ----                    -----------                           ------------
+ADMIN$     C:\Windows              Administration à distance                        0
+C$         C:\                     Partage par défaut                              0
+IPC$                               IPC distant                                      2
+Backup     D:\Backups              Sauvegardes serveurs                            5
+Public     D:\Public               Fichiers publics entreprise                    23
+Projets    E:\Projets              Projets en cours                               12
+OldFiles   F:\Archives\Old         Anciens fichiers 2015                           0
+```
+
+**Analyse** :
+
+| Partage | Type | Risque | Explication |
+|---------|------|--------|-------------|
+| `ADMIN$` | Système | 🟡 | Partage administratif par défaut (C:\Windows) - Nécessaire pour administration à distance |
+| `C$` | Système | 🟠 | Partage de TOUT le disque C: - Très dangereux si mal protégé |
+| `IPC$` | Système | 🟢 | Inter-Process Communication - Nécessaire au fonctionnement |
+| `Backup` | Utilisateur | 🔴 | **CRITIQUE** : Sauvegardes = cible n°1 des ransomwares ! |
+| `Public` | Utilisateur | 🟡 | Fichiers publics - Vérifier les permissions |
+| `Projets` | Utilisateur | 🟡 | Vérifier qui a accès |
+| `OldFiles` | Utilisateur | 🟠 | **PROBLÈME** : 0 utilisateurs connectés = Probablement inutile, surface d'attaque inutile |
+
+**🚨 Problèmes détectés** :
+1. Partage `C$` accessible (tout le disque !)
+2. Partage `OldFiles` : 0 utilisateurs → À supprimer
+3. Partage `Backup` : **5 utilisateurs connectés** → Qui sont-ils ? Ont-ils vraiment besoin d'accéder aux sauvegardes ?
+
+---
+
+### 🔍 Vérification 2 : Permissions sur les partages
+
+**Commande pour vérifier les permissions d'un partage** :
+
+```powershell
+Get-SmbShareAccess -Name "Backup" | Format-Table -AutoSize
+```
+
+**Exemple de résultat** :
+
+```
+Name   ScopeName AccountName          AccessControlType AccessRight
+----   --------- -----------          ----------------- -----------
+Backup *         Everyone             Allow             Full
+```
+
+**❌ CATASTROPHE !**
+
+**Analyse** :
+- `Everyone` = **Tout le monde** (tous les utilisateurs du réseau)
+- `Full` = **Contrôle total** (lecture, écriture, suppression, modification permissions)
+
+👉 **N'importe qui sur le réseau peut lire, modifier, ou SUPPRIMER les sauvegardes !**
+
+**Scénario d'attaque ransomware** :
+1. Hacker compromet un poste utilisateur (phishing, etc.)
+2. Scanne le réseau, trouve le partage `\\serveur\Backup`
+3. Accède avec le compte utilisateur compromis (Everyone = accès garanti)
+4. **CHIFFRE ou SUPPRIME toutes les sauvegardes**
+5. Chiffre ensuite le serveur principal
+6. Demande une rançon → Vous n'avez **PLUS DE SAUVEGARDES** pour restaurer
+
+👉 **C'est exactement ce qui s'est passé avec Colonial Pipeline, Kaseya, et des milliers d'entreprises**
+
+---
+
+**Vérification ✅ BON** (exemple sur un autre partage) :
+
+```powershell
+Get-SmbShareAccess -Name "Projets"
+```
+
+```
+Name    ScopeName AccountName               AccessControlType AccessRight
+----    --------- -----------               ----------------- -----------
+Projets *         DOMAIN\Groupe_Projets     Allow             Change
+Projets *         DOMAIN\Admins_IT          Allow             Full
+Projets *         DOMAIN\Users              Deny              Full
+```
+
+**Analyse** :
+- `DOMAIN\Groupe_Projets` : Lecture + Écriture (Change)
+- `DOMAIN\Admins_IT` : Contrôle total (Full)
+- `DOMAIN\Users` : **Refus explicite** (Deny)
+
+✅ Permissions restrictives, accès limité aux groupes autorisés !
+
+---
+
+### 🛠️ Correction : Sécuriser les permissions du partage Backup
+
+```powershell
+# 1. Retirer l'accès "Everyone"
+Revoke-SmbShareAccess -Name "Backup" -AccountName "Everyone" -Force
+
+# 2. Ajouter uniquement les comptes de service backup
+Grant-SmbShareAccess -Name "Backup" -AccountName "DOMAIN\svc_backup" -AccessRight Full -Force
+
+# 3. Ajouter les admins IT (lecture seule pour vérification)
+Grant-SmbShareAccess -Name "Backup" -AccountName "DOMAIN\Admins_IT" -AccessRight Read -Force
+
+# 4. Vérifier
+Get-SmbShareAccess -Name "Backup"
+```
+
+**Résultat attendu** :
+```
+Name   ScopeName AccountName          AccessControlType AccessRight
+----   --------- -----------          ----------------- -----------
+Backup *         DOMAIN\svc_backup    Allow             Full
+Backup *         DOMAIN\Admins_IT     Allow             Read
+```
+
+✅ Seul le compte de service backup et les admins IT peuvent accéder !
+
+---
+
+### 🔍 Vérification 3 : SMBv1 activé ? (DANGER)
+
+**La vérification LA PLUS CRITIQUE** de cette partie !
+
+**Commande** :
+
+```powershell
+Get-WindowsOptionalFeature -Online -FeatureName SMB1Protocol
+```
+
+**Scénario ❌ DANGER** :
+
+```
+FeatureName      : SMB1Protocol
+DisplayName      : SMB 1.0/CIFS File Sharing Support
+Description      : Support for the SMB 1.0/CIFS file sharing protocol...
+RestartRequired  : Possible
+State            : Enabled  ❌❌❌
+```
+
+👉 **SMBv1 est ACTIVÉ** → Ton serveur est vulnérable à **EternalBlue** et toutes les failles SMBv1 !
+
+**Scénario ✅ BON** :
+
+```
+FeatureName      : SMB1Protocol
+State            : Disabled  ✅
+```
+
+ou même mieux :
+
+```
+Get-WindowsOptionalFeature : Impossible de trouver la fonctionnalité 'SMB1Protocol'
+```
+
+👉 SMBv1 complètement supprimé du système !
+
+---
+
+**Correction URGENTE : Désactiver SMBv1**
+
+```powershell
+# Méthode 1 : Désactiver la fonctionnalité
+Disable-WindowsOptionalFeature -Online -FeatureName SMB1Protocol -NoRestart
+
+# Méthode 2 : Désactiver via la clé de registre (pour être sûr)
+Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Services\LanmanServer\Parameters" -Name "SMB1" -Value 0 -Type DWord -Force
+
+# Méthode 3 : Désactiver le pilote SMBv1
+sc.exe config lanmanworkstation depend= bowser/mrxsmb20/nsi
+sc.exe config mrxsmb10 start= disabled
+
+# Vérifier
+Get-WindowsOptionalFeature -Online -FeatureName SMB1Protocol
+```
+
+**Résultat attendu** :
+```
+State : Disabled
+```
+
+**⚠️ IMPORTANT** : Un **redémarrage** est généralement nécessaire pour que la désactivation soit complète.
+
+```powershell
+# Planifier un redémarrage (par exemple dans 10 minutes)
+shutdown /r /t 600 /c "Redémarrage pour désactivation SMBv1"
+
+# Annuler le redémarrage si besoin
+shutdown /a
+```
+
+---
+
+### 🔍 Vérification 4 : SMB Signing (Signature SMB)
+
+**Concept** : La signature SMB garantit que les paquets réseau ne sont **pas modifiés** en transit.
+
+**Analogie** : C'est comme un **sceau de cire** sur une lettre royale. Si quelqu'un ouvre la lettre pour la modifier, le sceau est cassé, et tu le vois immédiatement.
+
+**Sans signature** : Un attaquant en position "Man-in-the-Middle" peut **modifier** les paquets SMB (changer les données, injecter du code, etc.)
+
+**Commande** :
+
+```powershell
+Get-SmbServerConfiguration | Select-Object EnableSecuritySignature, RequireSecuritySignature
+```
+
+**Décortiquons** :
+
+| Paramètre | Signification | Valeur Recommandée |
+|-----------|---------------|-------------------|
+| `EnableSecuritySignature` | Le serveur **peut** signer les paquets si le client le demande | `True` |
+| `RequireSecuritySignature` | Le serveur **EXIGE** la signature (refuse les connexions non signées) | `True` |
+
+**Scénario ❌ DANGER** :
+
+```
+EnableSecuritySignature  : False
+RequireSecuritySignature : False
+```
+
+👉 Aucune signature SMB → Vulnérable aux attaques Man-in-the-Middle !
+
+**Scénario ⚠️ PROBLÈME** :
+
+```
+EnableSecuritySignature  : True
+RequireSecuritySignature : False
+```
+
+👉 Signature disponible mais pas obligatoire → Un client ancien (Windows XP, vieux NAS) peut se connecter SANS signature
+
+**Scénario ✅ BON** :
+
+```
+EnableSecuritySignature  : True
+RequireSecuritySignature : True
+```
+
+👉 Signature SMB **obligatoire** pour toutes les connexions !
+
+---
+
+**Correction : Activer et forcer la signature SMB**
+
+```powershell
+Set-SmbServerConfiguration -EnableSecuritySignature $true -RequireSecuritySignature $true -Force
+```
+
+**Vérifier** :
+
+```powershell
+Get-SmbServerConfiguration | Select-Object EnableSecuritySignature, RequireSecuritySignature
+```
+
+**Résultat attendu** :
+```
+EnableSecuritySignature  : True
+RequireSecuritySignature : True
+```
+
+✅ Signature SMB activée et obligatoire !
+
+**⚠️ Attention** : Si tu as de très vieux clients (Windows XP, Windows 2000), ils ne pourront **plus se connecter**. Mais franchement, en 2025, si tu as encore Windows XP sur ton réseau... tu as des problèmes bien plus graves ! 😅
+
+---
+
+### 🔍 Vérification 5 : Chiffrement SMB3
+
+**Concept** : SMB3 (depuis Windows 8/Server 2012) peut **chiffrer** les données en transit.
+
+**Analogie** : C'est comme envoyer tes documents dans un **coffre-fort blindé** plutôt qu'une enveloppe transparente.
+
+**Commande** :
+
+```powershell
+Get-SmbServerConfiguration | Select-Object EncryptData, RejectUnencryptedAccess
+```
+
+**Scénario ✅ BON** :
+
+```
+EncryptData             : True
+RejectUnencryptedAccess : True
+```
+
+👉 Chiffrement activé, connexions non chiffrées refusées !
+
+**Scénario ❌ DANGER** :
+
+```
+EncryptData             : False
+RejectUnencryptedAccess : False
+```
+
+👉 Aucun chiffrement → Données lisibles en clair sur le réseau (sniffing possible)
+
+**Correction** :
+
+```powershell
+Set-SmbServerConfiguration -EncryptData $true -RejectUnencryptedAccess $true -Force
+```
+
+**⚠️ Compatibilité** : Le chiffrement SMB3 nécessite :
+- Windows 8 / Server 2012 ou plus récent
+- Si tu as des clients plus anciens, ils ne pourront pas se connecter
+
+**Alternative** : Chiffrer uniquement certains partages critiques
+
+```powershell
+# Chiffrer uniquement le partage "Backup"
+Set-SmbShare -Name "Backup" -EncryptData $true
+```
+
+---
+
+### 🗑️ Vérification 6 : Supprimer les partages inutiles
+
+**Rappel** : Dans notre inventaire, on avait détecté `OldFiles` avec 0 utilisateurs connectés.
+
+**Commande pour supprimer un partage** :
+
+```powershell
+# Vérifier une dernière fois
+Get-SmbShare -Name "OldFiles"
+
+# Supprimer le partage (ne supprime PAS les fichiers, juste le partage réseau)
+Remove-SmbShare -Name "OldFiles" -Force
+```
+
+**⚠️ IMPORTANT** : `Remove-SmbShare` supprime **uniquement** le partage réseau, pas les fichiers physiques sur le disque.
+
+**Si tu veux aussi supprimer les fichiers** :
+
+```powershell
+# Sauvegarder d'abord (au cas où)
+Copy-Item -Path "F:\Archives\Old" -Destination "F:\Archives\OLD_BACKUP_$(Get-Date -Format 'yyyyMMdd')" -Recurse
+
+# Puis supprimer
+Remove-Item -Path "F:\Archives\Old" -Recurse -Force
+```
+
+---
+
+### 📋 Récapitulatif : Partages Réseau (SMB)
+
+**Checklist de sécurité** :
+
+- [ ] Inventaire des partages réseau réalisé
+- [ ] Partages inutiles supprimés (0 utilisateurs, anciens projets, etc.)
+- [ ] Permissions vérifiées : **AUCUN partage avec "Everyone : Full"**
+- [ ] Partages de sauvegardes : Accès limité aux comptes de service uniquement
+- [ ] SMBv1 : **DÉSACTIVÉ** (State: Disabled)
+- [ ] SMB Signing : **ACTIVÉ ET OBLIGATOIRE**
+  - `EnableSecuritySignature: True`
+  - `RequireSecuritySignature: True`
+- [ ] Chiffrement SMB3 : **ACTIVÉ** (au moins sur partages sensibles)
+- [ ] Partages administratifs (C$, ADMIN$) : Accès restreint aux admins uniquement
+- [ ] Documentation des partages légitimes et de leurs permissions
+- [ ] Révision trimestrielle des partages et permissions
+
+**🎓 Ce que tu maîtrises maintenant :**
+- ✅ Lister et auditer les partages SMB
+- ✅ Comprendre les risques de SMBv1 (EternalBlue, WannaCry)
+- ✅ Désactiver complètement SMBv1
+- ✅ Configurer les permissions SMB de manière restrictive
+- ✅ Activer et forcer la signature SMB
+- ✅ Activer le chiffrement SMB3
+- ✅ Sécuriser les partages de sauvegardes (cible n°1 des ransomwares)
+- ✅ Supprimer les partages inutiles
+
+**Niveau actuel : 🌟🌟🌟🌟🌟🌟🌟🌟 Maître de la Sécurité !**
+
+---
+
+## 🛡️ Partie 9 : User Account Control (UAC) - Le Gardien du Château
+
+### 🎯 Concept : UAC, c'est quoi ?
+
+**UAC** (User Account Control) = Le mécanisme qui te demande **"Êtes-vous sûr ?"** quand tu veux faire une action d'administration.
+
+**L'analogie** : Imagine UAC comme le **garde royal** à l'entrée du château.
+- Sans UAC : N'importe qui peut entrer dans la salle du trône (= exécuter du code avec privilèges admin)
+- Avec UAC : Le garde demande **"Êtes-vous vraiment le roi ?"** avant de laisser passer
+
+**Pourquoi c'est important ?**
+- **Bloque les malwares** qui tentent d'obtenir des privilèges admin silencieusement
+- Force l'utilisateur (ou l'attaquant) à **confirmer** les actions sensibles
+- Empêche les modifications du système par des processus non autorisés
+
+### 📊 Statistiques et attaques réelles
+
+- Selon Microsoft : **UAC bloque environ 80% des tentatives d'infection par malwares** qui nécessitent des privilèges admin
+- **Bypass UAC** : Technique utilisée par les hackers pour contourner UAC (environ 50+ méthodes connues)
+- De nombreux ransomwares tentent de désactiver UAC via le registre pour faciliter leur propagation
+- **CIS Benchmark** : Recommande UAC au niveau **maximum** (Always notify) pour les serveurs critiques
+
+**Exemples d'attaques** :
+- **Emotet** : Tente de désactiver UAC pour installer des composants supplémentaires
+- **Ryuk Ransomware** : Abuse des comptes admin avec UAC désactivé pour se propager
+- **Privilege Escalation** : De nombreux exploits Windows nécessitent UAC désactivé ou mal configuré
+
+### 🔍 Vérification 1 : Niveau UAC configuré
+
+**Commande** :
+
+```powershell
+Get-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System" | Select-Object ConsentPromptBehaviorAdmin, PromptOnSecureDesktop, EnableLUA
+```
+
+**Décortiquons les paramètres** :
+
+| Paramètre | Signification | Valeurs |
+|-----------|---------------|---------|
+| `EnableLUA` | UAC activé ou désactivé | `1` = Activé ✅ / `0` = Désactivé ❌ |
+| `ConsentPromptBehaviorAdmin` | Comportement pour les admins | `0` = Pas de prompt ❌ / `2` = Prompt ✅ / `5` = Prompt avec mot de passe 🔐 |
+| `PromptOnSecureDesktop` | Afficher le prompt sur bureau sécurisé (fond sombre) | `1` = Oui ✅ / `0` = Non ❌ |
+
+**Exemple de résultat** :
+
+**Scénario ❌ CATASTROPHE** :
+
+```
+EnableLUA                    : 0
+ConsentPromptBehaviorAdmin   : 0
+PromptOnSecureDesktop        : 0
+```
+
+👉 **UAC complètement désactivé** → N'importe quel programme peut obtenir des privilèges admin sans demander !
+
+**Scénario ⚠️ PROBLÈME** :
+
+```
+EnableLUA                    : 1
+ConsentPromptBehaviorAdmin   : 0
+PromptOnSecureDesktop        : 0
+```
+
+👉 UAC activé mais ne demande **jamais** de confirmation → Inutile !
+
+**Scénario ✅ BON** :
+
+```
+EnableLUA                    : 1
+ConsentPromptBehaviorAdmin   : 2
+PromptOnSecureDesktop        : 1
+```
+
+👉 UAC activé avec demande de confirmation sur bureau sécurisé !
+
+**Scénario 🔐 EXCELLENT** (recommandé pour serveurs critiques) :
+
+```
+EnableLUA                    : 1
+ConsentPromptBehaviorAdmin   : 5
+PromptOnSecureDesktop        : 1
+```
+
+👉 UAC au niveau **maximum** : Demande le mot de passe administrateur à chaque fois !
+
+---
+
+### 🛠️ Correction : Configurer UAC au niveau recommandé
+
+**Pour serveurs de production (recommandé CIS Benchmark)** :
+
+```powershell
+# Activer UAC
+Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System" -Name "EnableLUA" -Value 1
+
+# Forcer le prompt de consentement pour les admins
+Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System" -Name "ConsentPromptBehaviorAdmin" -Value 2
+
+# Utiliser le bureau sécurisé (fond sombre, impossible de cliquer ailleurs)
+Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System" -Name "PromptOnSecureDesktop" -Value 1
+
+# Vérifier
+Get-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System" | Select-Object EnableLUA, ConsentPromptBehaviorAdmin, PromptOnSecureDesktop
+```
+
+**Pour serveurs ULTRA-critiques (niveau maximum)** :
+
+```powershell
+# UAC au niveau le plus strict : Demander le mot de passe admin à chaque fois
+Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System" -Name "ConsentPromptBehaviorAdmin" -Value 5
+```
+
+**⚠️ Impact** :
+- Avec `ConsentPromptBehaviorAdmin = 2` : Une boîte de dialogue **Oui/Non** apparaît
+- Avec `ConsentPromptBehaviorAdmin = 5` : Il faut entrer le **mot de passe administrateur** à chaque fois
+
+Pour un serveur, `2` est généralement suffisant. Pour un contrôleur de domaine ou serveur ultra-sensible, considère `5`.
+
+---
+
+### 🔍 Vérification 2 : UAC pour les utilisateurs standard
+
+**Concept** : Les utilisateurs **non-administrateurs** devraient **TOUJOURS** avoir besoin d'un mot de passe admin pour élever leurs privilèges.
+
+**Commande** :
+
+```powershell
+Get-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System" | Select-Object ConsentPromptBehaviorUser
+```
+
+**Valeurs possibles** :
+
+| Valeur | Signification | Sécurité |
+|--------|---------------|----------|
+| `0` | Refuser automatiquement les demandes d'élévation | 🟡 Sécurisé mais peut bloquer des tâches légitimes |
+| `1` | Demander les credentials sur bureau sécurisé | ✅ **RECOMMANDÉ** |
+| `3` | Demander les credentials (bureau normal) | ⚠️ Moins sécurisé (peut être "overlayé" par un malware) |
+
+**Scénario ✅ BON** :
+
+```
+ConsentPromptBehaviorUser : 1
+```
+
+👉 Les utilisateurs standard doivent fournir un mot de passe admin sur bureau sécurisé !
+
+**Scénario ❌ PROBLÈME** :
+
+```
+ConsentPromptBehaviorUser : 3
+```
+
+👉 Demande credentials mais pas sur bureau sécurisé → Un malware peut afficher une fausse fenêtre de login !
+
+---
+
+**Correction** :
+
+```powershell
+# Forcer le prompt sur bureau sécurisé pour les utilisateurs standard
+Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System" -Name "ConsentPromptBehaviorUser" -Value 1
+```
+
+---
+
+### 🔍 Vérification 3 : Applications signées vs non-signées
+
+**Concept** : UAC peut faire la distinction entre les applications **signées numériquement** (Microsoft, éditeurs reconnus) et les **applications non signées** (potentiellement dangereuses).
+
+**Commande** :
+
+```powershell
+Get-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System" | Select-Object ValidateAdminCodeSignatures
+```
+
+**Valeurs** :
+
+| Valeur | Signification |
+|--------|---------------|
+| `0` | Ne pas valider les signatures (par défaut) |
+| `1` | Exiger que les applications soient signées pour obtenir élévation |
+
+**Scénario ✅ TRÈS SÉCURISÉ** (environnements hautement sensibles) :
+
+```
+ValidateAdminCodeSignatures : 1
+```
+
+👉 Seules les applications **signées numériquement** peuvent obtenir des privilèges admin !
+
+**⚠️ Attention** : Cela peut **bloquer** certains scripts PowerShell maison ou outils d'administration non signés. À activer uniquement si tu contrôles strictement ce qui s'exécute sur le serveur.
+
+**Activation (optionnel, pour environnements ultra-sécurisés)** :
+
+```powershell
+Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System" -Name "ValidateAdminCodeSignatures" -Value 1
+```
+
+---
+
+### 🔍 Vérification 4 : Détection des modifications UAC
+
+**Le risque** : Un malware ou un attaquant peut tenter de **désactiver UAC** en modifiant le registre.
+
+**Commande pour vérifier l'historique des modifications** :
+
+```powershell
+# Vérifier l'Event ID 4719 : Modification de politique d'audit système
+Get-WinEvent -FilterHashtable @{LogName='Security'; ID=4719} -MaxEvents 20 | ForEach-Object {
+    $xml = [xml]$_.ToXml()
+    [PSCustomObject]@{
+        TimeCreated = $_.TimeCreated
+        User = $xml.Event.EventData.Data[1].'#text'
+        Changes = $_.Message
+    }
+} | Format-Table -Wrap
+```
+
+**Recherche de modifications dans le registre UAC** :
+
+```powershell
+# Vérifier l'Event ID 4657 : Modification de clé de registre
+Get-WinEvent -FilterHashtable @{LogName='Security'; ID=4657} -MaxEvents 100 | Where-Object {
+    $_.Message -like "*Policies\System*"
+} | Select-Object TimeCreated, Message | Format-List
+```
+
+**Ce qu'il faut surveiller** :
+- Modifications des clés `HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System`
+- Changements de `EnableLUA` de 1 à 0
+- Modifications par des comptes **non autorisés**
+
+---
+
+### 📋 Récapitulatif : User Account Control (UAC)
+
+**Checklist de sécurité** :
+
+- [ ] UAC activé (`EnableLUA = 1`)
+- [ ] Prompt de consentement pour admins activé (`ConsentPromptBehaviorAdmin = 2` ou `5`)
+- [ ] Bureau sécurisé activé (`PromptOnSecureDesktop = 1`)
+- [ ] Prompt pour utilisateurs standard configuré (`ConsentPromptBehaviorUser = 1`)
+- [ ] Validation des signatures (optionnel) : Considérée pour environnements critiques
+- [ ] Surveillance des modifications UAC dans les logs (Event ID 4719, 4657)
+- [ ] Aucune exception UAC configurée via GPO pour des applications non fiables
+- [ ] Documentation des raisons si UAC est abaissé sur certains serveurs
+- [ ] Test régulier du fonctionnement UAC
+
+**🎓 Ce que tu maîtrises maintenant :**
+- ✅ Comprendre le rôle d'UAC dans la défense en profondeur
+- ✅ Vérifier la configuration UAC via le registre
+- ✅ Configurer UAC aux niveaux recommandés (CIS Benchmark)
+- ✅ Différencier les niveaux UAC (0, 2, 5)
+- ✅ Configurer UAC pour utilisateurs standard vs administrateurs
+- ✅ Activer le bureau sécurisé (protection contre les fake prompts)
+- ✅ Surveiller les tentatives de désactivation d'UAC
+- ✅ Comprendre l'impact de la validation des signatures
+
+**Niveau actuel : 🌟🌟🌟🌟🌟🌟🌟🌟🌟 Grand Maître !**
+
+---
+
+## 🌍 Partie 10 : Sécurité Réseau et Protocoles - Blinder les Communications
+
+### 🎯 Concept : Protocoles d'authentification Windows
+
+Windows utilise plusieurs protocoles pour **authentifier** les utilisateurs sur le réseau :
+
+1. **NTLM** (NT LAN Manager) : Ancien protocole des années 1990
+   - **NTLMv1** : Extrêmement faible, cassable en quelques heures
+   - **NTLMv2** : Plus robuste, mais toujours vulnérable aux attaques "Pass-the-Hash"
+
+2. **Kerberos** : Protocole moderne et sécurisé (depuis Windows 2000)
+   - Utilise des **tickets** avec durée de vie limitée
+   - Chiffrement fort (AES)
+   - **Recommandé** pour tous les environnements Active Directory
+
+**L'analogie** :
+- **NTLMv1** = Envoyer ton mot de passe en lettre recommandée (facilement interceptable)
+- **NTLMv2** = Envoyer un code d'accès temporaire (mieux, mais peut être réutilisé)
+- **Kerberos** = Système de badges à durée limitée avec vérification d'identité (moderne et sûr)
+
+### 📊 Statistiques et attaques
+
+- **80% des compromissions Active Directory** impliquent des attaques NTLM (Pass-the-Hash, NTLM Relay)
+- **Mimikatz** : Outil hacker capable d'extraire les hash NTLM de la mémoire en quelques secondes
+- **NTLM Relay** : Technique permettant de "relayer" une authentification NTLM pour accéder à un autre serveur
+- Selon le **CIS Benchmark** : NTLM devrait être **désactivé** ou limité au strict minimum, Kerberos préféré
+
+**Exemples d'attaques réelles** :
+- **Pass-the-Hash** : L'attaquant vole le hash NTLM (sans connaître le mot de passe) et l'utilise pour s'authentifier
+- **NTLM Relay** : Utilisé dans les attaques PetitPotam, PrinterBug pour compromettre des contrôleurs de domaine
+- **Downgrade Attack** : Forcer un client Kerberos à utiliser NTLM (plus faible) pour faciliter l'attaque
+
+### 🔍 Vérification 1 : Niveau de compatibilité LM (LmCompatibilityLevel)
+
+**Commande** :
+
+```powershell
+Get-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\Lsa" -Name "LmCompatibilityLevel"
+```
+
+**Valeurs possibles** :
+
+| Valeur | Protocoles Acceptés | Sécurité | Recommandation |
+|--------|---------------------|----------|----------------|
+| `0` | LM, NTLM, NTLMv2 | ❌ **CATASTROPHIQUE** | Jamais ! |
+| `1` | LM, NTLM, NTLMv2 (préfère NTLMv2) | ❌ **TRÈS FAIBLE** | Jamais ! |
+| `2` | NTLM, NTLMv2 | 🟠 **FAIBLE** | Non recommandé |
+| `3` | NTLMv2 uniquement | 🟡 **MOYEN** | Acceptable temporaire |
+| `4` | NTLMv2, refuse LM/NTLM | 🟢 **BON** | Minimum recommandé |
+| `5` | NTLMv2 uniquement, refus total LM/NTLM | ✅ **EXCELLENT** | **CIS Benchmark recommandé** |
+
+**Scénario ❌ CATASTROPHE** :
+
+```
+LmCompatibilityLevel : 0
+```
+
+ou
+
+```
+Get-ItemProperty : La propriété 'LmCompatibilityLevel' est introuvable
+```
+
+👉 Niveau par défaut (0 ou non défini) → Accepte **LM et NTLM** (protocoles des années 1990, cassables en minutes) !
+
+**Scénario ✅ BON** :
+
+```
+LmCompatibilityLevel : 5
+```
+
+👉 Refuse complètement LM et NTLM, n'accepte que NTLMv2 (et préfère Kerberos) !
+
+---
+
+### 🛠️ Correction : Forcer NTLMv2 et refuser LM/NTLM
+
+```powershell
+# Définir le niveau de compatibilité LM au niveau 5 (le plus sécurisé)
+Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\Lsa" -Name "LmCompatibilityLevel" -Value 5 -Type DWord
+
+# Vérifier
+Get-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\Lsa" -Name "LmCompatibilityLevel"
+```
+
+**Résultat attendu** :
+
+```
+LmCompatibilityLevel : 5
+```
+
+**⚠️ Compatibilité** :
+- Niveau 5 peut **bloquer** de très vieux clients (Windows 95/98, Windows NT 4.0)
+- En 2025, si tu as encore de tels systèmes... il est temps de les remplacer ! 😅
+- Tous les systèmes **Windows 2000 et ultérieurs** supportent NTLMv2
+
+---
+
+### 🔍 Vérification 2 : Audit NTLM et restrictions
+
+**Objectif** : Identifier quels systèmes utilisent **encore** NTLM pour pouvoir les migrer vers Kerberos.
+
+**Commande pour activer l'audit NTLM** :
+
+```powershell
+# Activer l'audit NTLM (niveau : Auditer tout)
+Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\Lsa\MSV1_0" -Name "AuditReceivingNTLMTraffic" -Value 2 -Type DWord
+Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\Lsa\MSV1_0" -Name "RestrictSendingNTLMTraffic" -Value 1 -Type DWord
+
+# Redémarrer le service Netlogon pour appliquer
+Restart-Service -Name "Netlogon" -Force
+```
+
+**Explications** :
+
+| Paramètre | Valeur | Signification |
+|-----------|--------|---------------|
+| `AuditReceivingNTLMTraffic` | `2` | Auditer **toutes** les authentifications NTLM entrantes |
+| `RestrictSendingNTLMTraffic` | `1` | Auditer les tentatives NTLM sortantes (mais **ne pas bloquer**) |
+
+**Consulter les logs NTLM** :
+
+```powershell
+# Event ID 8004 : Audit NTLM
+Get-WinEvent -FilterHashtable @{LogName='System'; ID=8004} -MaxEvents 20 | ForEach-Object {
+    [PSCustomObject]@{
+        TimeCreated = $_.TimeCreated
+        Message = $_.Message
+    }
+} | Format-List
+```
+
+**Ce que tu verras** :
+- Quels **serveurs/clients** utilisent encore NTLM
+- Quelles **applications** dépendent de NTLM
+- Cela te permet de **planifier la migration** vers Kerberos
+
+**Phase 2 : Bloquer NTLM (après avoir identifié et corrigé les dépendances)** :
+
+```powershell
+# BLOQUER complètement NTLM (phase finale, après tests approfondis)
+Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\Lsa\MSV1_0" -Name "RestrictSendingNTLMTraffic" -Value 2 -Type DWord
+```
+
+⚠️ **NE PAS FAIRE IMMÉDIATEMENT** : Cela peut **casser** des applications qui dépendent encore de NTLM. Procéder par étapes :
+1. Activer l'audit (`Value = 1`)
+2. Identifier les dépendances
+3. Migrer vers Kerberos
+4. Bloquer NTLM (`Value = 2`)
+
+---
+
+### 🔍 Vérification 3 : Désactiver le stockage des hash LM
+
+**Le risque** : Par défaut, Windows peut stocker les **hash LM** (ultra-faibles) en plus des hash NTLM.
+
+**Commande** :
+
+```powershell
+Get-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\Lsa" -Name "NoLMHash" -ErrorAction SilentlyContinue
+```
+
+**Scénario ❌ DANGER** :
+
+```
+Get-ItemProperty : La propriété 'NoLMHash' est introuvable
+```
+
+ou
+
+```
+NoLMHash : 0
+```
+
+👉 Le système **stocke les hash LM** → Cassables en quelques minutes avec des outils comme **Hashcat** !
+
+**Scénario ✅ BON** :
+
+```
+NoLMHash : 1
+```
+
+👉 Hash LM **désactivés** → Seuls les hash NTLM (plus robustes) sont stockés !
+
+---
+
+**Correction : Désactiver complètement les hash LM** :
+
+```powershell
+# Désactiver le stockage des hash LM
+Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\Lsa" -Name "NoLMHash" -Value 1 -Type DWord
+
+# Vérifier
+Get-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\Lsa" -Name "NoLMHash"
+```
+
+**Résultat attendu** :
+
+```
+NoLMHash : 1
+```
+
+✅ Hash LM désactivés !
+
+**⚠️ Important** : Les hash LM **existants** ne sont pas supprimés automatiquement. Pour forcer leur suppression, les utilisateurs doivent **changer leur mot de passe** après cette modification.
+
+**Commande pour forcer le changement de mot de passe** (à faire pour les comptes locaux critiques) :
+
+```powershell
+# Exemple : Forcer le changement de mot de passe pour un compte local
+net user "NomUtilisateur" /logonpasswordchg:yes
+```
+
+---
+
+### 🔍 Vérification 4 : Protection LDAP Signing et LDAP Channel Binding
+
+**Concept** : LDAP (Lightweight Directory Access Protocol) est utilisé pour communiquer avec Active Directory.
+
+**Les risques** :
+- **LDAP sans signature** : Un attaquant peut intercepter et **modifier** les requêtes LDAP
+- **LDAP Relay** : Technique pour "relayer" une authentification LDAP vers un autre serveur
+
+**Commande** :
+
+```powershell
+Get-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Services\NTDS\Parameters" -Name "LDAPServerIntegrity" -ErrorAction SilentlyContinue
+```
+
+**Valeurs** :
+
+| Valeur | Signification | Sécurité |
+|--------|---------------|----------|
+| `0` | Pas de signature requise | ❌ **FAIBLE** |
+| `1` | Signature requise | ✅ **RECOMMANDÉ** |
+| `2` | Signature et chiffrement requis | 🔐 **EXCELLENT** |
+
+**Scénario ❌ PROBLÈME** :
+
+```
+Get-ItemProperty : La propriété 'LDAPServerIntegrity' est introuvable
+```
+
+ou
+
+```
+LDAPServerIntegrity : 0
+```
+
+👉 LDAP **sans signature** → Vulnérable aux attaques Man-in-the-Middle et LDAP Relay !
+
+**Scénario ✅ BON** :
+
+```
+LDAPServerIntegrity : 1
+```
+
+👉 Signature LDAP **obligatoire** !
+
+---
+
+**Correction : Activer la signature LDAP** :
+
+```powershell
+# Activer la signature LDAP (nécessite que le serveur soit un contrôleur de domaine)
+Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Services\NTDS\Parameters" -Name "LDAPServerIntegrity" -Value 1 -Type DWord
+
+# Pour les clients LDAP (forcer la signature côté client aussi)
+Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Services\LDAP" -Name "LDAPClientIntegrity" -Value 1 -Type DWord
+
+# Vérifier
+Get-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Services\NTDS\Parameters" -Name "LDAPServerIntegrity" -ErrorAction SilentlyContinue
+Get-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Services\LDAP" -Name "LDAPClientIntegrity" -ErrorAction SilentlyContinue
+```
+
+**Note** : `HKLM:\SYSTEM\CurrentControlSet\Services\NTDS\Parameters` n'existe que sur les **contrôleurs de domaine**. Si tu es sur un serveur membre, seul le paramètre client (`LDAP`) est applicable.
+
+---
+
+### 🔍 Vérification 5 : Chiffrement Kerberos (AES vs RC4)
+
+**Concept** : Kerberos peut utiliser différents algorithmes de chiffrement.
+
+**Algorithmes disponibles** :
+
+| Algorithme | Force | Statut | Recommandation |
+|------------|-------|--------|----------------|
+| DES | Très faible (56-bit) | Obsolète depuis 2008 | ❌ **DÉSACTIVER** |
+| RC4-HMAC | Faible (128-bit mais vulnérabilités) | Déprécié | 🟠 **DÉSACTIVER si possible** |
+| AES128-SHA1 | Fort (128-bit) | Moderne | ✅ **ACTIVER** |
+| AES256-SHA1 | Très fort (256-bit) | Moderne | ✅ **ACTIVER** |
+
+**Commande** :
+
+```powershell
+Get-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System\Kerberos\Parameters" -Name "SupportedEncryptionTypes" -ErrorAction SilentlyContinue
+```
+
+**Valeurs** (flags binaires additionnés) :
+
+| Flag | Valeur | Algorithme |
+|------|--------|------------|
+| DES_CBC_CRC | 0x1 | DES (obsolète) |
+| DES_CBC_MD5 | 0x2 | DES (obsolète) |
+| RC4_HMAC_MD5 | 0x4 | RC4 (faible) |
+| AES128_HMAC_SHA1 | 0x8 | AES-128 ✅ |
+| AES256_HMAC_SHA1 | 0x10 | AES-256 ✅ |
+| FUTURE | 0x20 | Algorithmes futurs |
+
+**Configuration RECOMMANDÉE** : `0x18` (décimal : `24`)
+- `0x8` (AES-128) + `0x10` (AES-256) = `0x18`
+- Active **uniquement** AES-128 et AES-256, refuse DES et RC4
+
+**Scénario ❌ PROBLÈME** :
+
+```
+Get-ItemProperty : La propriété 'SupportedEncryptionTypes' est introuvable
+```
+
+👉 Configuration par défaut → Accepte **tous** les algorithmes (y compris DES et RC4) !
+
+**Scénario ✅ BON** :
+
+```
+SupportedEncryptionTypes : 24
+```
+
+ou en hexadécimal :
+
+```
+SupportedEncryptionTypes : 0x18
+```
+
+👉 Uniquement AES-128 et AES-256 activés !
+
+---
+
+**Correction : Forcer AES uniquement pour Kerberos** :
+
+```powershell
+# Créer le chemin si nécessaire
+New-Item -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System\Kerberos" -Name "Parameters" -Force -ErrorAction SilentlyContinue
+
+# Activer UNIQUEMENT AES-128 et AES-256 (valeur 24 décimal = 0x18 hex)
+Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System\Kerberos\Parameters" -Name "SupportedEncryptionTypes" -Value 24 -Type DWord
+
+# Vérifier
+Get-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System\Kerberos\Parameters" -Name "SupportedEncryptionTypes"
+```
+
+**Résultat attendu** :
+
+```
+SupportedEncryptionTypes : 24
+```
+
+✅ Kerberos configuré pour utiliser **uniquement AES** !
+
+**⚠️ Compatibilité** :
+- AES est supporté depuis **Windows Server 2008** et **Windows Vista**
+- Si tu as des systèmes plus anciens (Windows XP, Server 2003)... il est **vraiment** temps de les remplacer !
+
+---
+
+### 📋 Récapitulatif : Sécurité Réseau et Protocoles
+
+**Checklist de sécurité** :
+
+- [ ] Niveau de compatibilité LM : **5** (Refuse LM et NTLM, n'accepte que NTLMv2)
+- [ ] Hash LM désactivés (`NoLMHash = 1`)
+- [ ] Audit NTLM activé pour identifier les dépendances
+- [ ] Plan de migration de NTLM vers Kerberos en cours
+- [ ] Signature LDAP activée (serveur et client)
+- [ ] Kerberos : Uniquement AES-128 et AES-256 activés (`SupportedEncryptionTypes = 24`)
+- [ ] DES et RC4 désactivés pour Kerberos
+- [ ] Surveillance des authentifications NTLM (Event ID 8004)
+- [ ] Documentation des systèmes nécessitant encore NTLM (et plan de migration)
+- [ ] Tests de compatibilité avant blocage complet de NTLM
+
+**🎓 Ce que tu maîtrises maintenant :**
+- ✅ Comprendre les différences entre LM, NTLM, NTLMv2, et Kerberos
+- ✅ Configurer le niveau de compatibilité LM (LmCompatibilityLevel)
+- ✅ Désactiver les hash LM (NoLMHash)
+- ✅ Auditer les utilisations de NTLM
+- ✅ Activer la signature LDAP (protection contre LDAP Relay)
+- ✅ Configurer Kerberos pour utiliser uniquement AES
+- ✅ Comprendre les attaques Pass-the-Hash et NTLM Relay
+- ✅ Planifier une migration progressive vers Kerberos
+- ✅ Bloquer les protocoles obsolètes (DES, RC4, LM)
+
+**Niveau actuel : 🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟 LÉGENDE ! Respect total ! 🏆**
+
+---

@@ -1184,12 +1184,895 @@ Write-Host "Pare-feu: Restreint à $AdminIP" -ForegroundColor Green
 
 ---
 
-*[Guide Windows Server 2022 - Parties 4-10 à venir]*
+## 🛡️ PARTIE 4 : Pare-feu Windows Defender - La Première Ligne de Défense
+
+### 🎓 Concept : Le Pare-feu = Le Mur d'enceinte de ton Château
+
+**Analogie :** Le pare-feu Windows Defender, c'est le mur d'enceinte de ton château :
+- **Activé** = Mur haut et solide, avec gardes aux portes
+- **Désactivé** = Pas de mur, tout le monde entre et sort librement
+
+**Principe fondamental :** **Deny by default, allow by exception**
+- Par défaut, tout est **BLOQUÉ**
+- Tu autorises SEULEMENT ce qui est nécessaire
+
+**Statistiques :**
+- 43% des PME n'ont PAS de pare-feu actif sur leurs serveurs (Cybint 2023)
+- Un serveur sans pare-feu sur Internet est scanné en moyenne **5 minutes** après sa mise en ligne
+
+### ✅ Check #1 : Pare-feu Actif sur Tous les Profils
+
+Windows a **3 profils** de pare-feu :
+1. **Domain** = Quand le serveur est connecté à un domaine Active Directory
+2. **Private** = Réseau privé/local
+3. **Public** = Réseaux publics (WiFi café, etc.)
+
+**IMPORTANT :** Le pare-feu doit être actif sur LES 3 profils !
+
+#### Commande : Vérifier le statut du pare-feu
+
+```powershell
+Get-NetFirewallProfile | Select-Object Name, Enabled
+```
+
+**💻 Résultat ATTENDU :**
+
+```
+Name    Enabled
+----    -------
+Domain     True
+Private    True
+Public     True
+```
+
+**✅ Analyse :**
+- Les 3 profils affichent `Enabled: True`
+- **PARFAIT !** Ton serveur est protégé dans tous les contextes réseau
+
+**❌ PROBLÈME - Si un profil est désactivé :**
+
+```
+Name    Enabled
+----    -------
+Domain     True
+Private   False    ← PROBLÈME !
+Public     True
+```
+
+**Risque :** Si ton serveur est sur un réseau considéré comme "Private" sans pare-feu = **porte grande ouverte !**
+
+**🔧 Correction :**
+
+```powershell
+# Active le pare-feu sur TOUS les profils
+Set-NetFirewallProfile -Profile Domain,Private,Public -Enabled True
+
+# Vérifie
+Get-NetFirewallProfile | Select-Object Name, Enabled
+```
+
+### ✅ Check #2 : Politique Par Défaut
+
+#### Commande : Vérifier les actions par défaut
+
+```powershell
+Get-NetFirewallProfile | Select-Object Name, DefaultInboundAction, DefaultOutboundAction
+```
+
+**💻 Résultat ATTENDU (configuration sécurisée) :**
+
+```
+Name    DefaultInboundAction DefaultOutboundAction
+----    -------------------- ---------------------
+Domain  Block                Allow
+Private Block                Allow
+Public  Block                Allow
+```
+
+**🔍 Analyse :**
+
+| Paramètre | Valeur IDÉALE | Signification |
+|-----------|---------------|---------------|
+| `DefaultInboundAction` | **Block** | Tout le trafic ENTRANT est bloqué par défaut |
+| `DefaultOutboundAction` | **Allow** | Le trafic SORTANT est autorisé par défaut |
+
+**💡 Pourquoi cette configuration ?**
+
+**Inbound (entrant) = Block :**
+- Empêche les connexions non sollicitées depuis Internet
+- Tu dois explicitement autoriser chaque service (RDP, HTTP, etc.)
+- Sécurité maximale
+
+**Outbound (sortant) = Allow :**
+- Le serveur peut accéder aux mises à jour Windows
+- Peut contacter les serveurs DNS, NTP, etc.
+- Plus pratique pour l'administration
+
+**⚠️ Configuration TRÈS restrictive (pour environnements ultra-sécurisés) :**
+
+```powershell
+# Bloque AUSSI le trafic sortant par défaut
+Set-NetFirewallProfile -Profile Domain,Private,Public -DefaultOutboundAction Block
+```
+
+**Note :** Si tu fais ça, tu devras autoriser CHAQUE connexion sortante (Windows Update, DNS, etc.). Réservé aux environnements avec besoin de traçabilité maximale.
+
+**❌ PROBLÈME - DefaultInboundAction = Allow :**
+
+```
+Name    DefaultInboundAction DefaultOutboundAction
+----    -------------------- ---------------------
+Domain  Allow                Allow    ← DANGER !
+```
+
+**Risque :** N'importe qui peut se connecter à n'importe quel port !
+
+**🔧 Correction URGENTE :**
+
+```powershell
+Set-NetFirewallProfile -Profile Domain,Private,Public -DefaultInboundAction Block -DefaultOutboundAction Allow
+```
+
+### ✅ Check #3 : Règles Entrantes Actives
+
+#### Commande : Lister toutes les règles entrantes actives
+
+```powershell
+Get-NetFirewallRule -Direction Inbound -Enabled True | Select-Object DisplayName, Action, Profile | Sort-Object DisplayName
+```
+
+**💻 Exemple de résultat :**
+
+```
+DisplayName                                    Action Profile
+-----------                                    ------ -------
+Core Networking - Destination Unreachable...  Allow  Any
+Core Networking - Dynamic Port (ICMPv6-In)    Allow  Any
+File and Printer Sharing (Echo Request -...   Allow  Domain
+Remote Desktop - User Mode (TCP-In)           Allow  Domain
+Windows Remote Management (HTTP-In)           Allow  Domain
+```
+
+**🔍 Ce qu'il faut vérifier :**
+
+1. **Nombre de règles** : Idéalement < 20 règles
+   - Plus tu as de règles = Plus la surface d'attaque est grande
+
+2. **Chaque règle doit être justifiée** :
+   - ✅ "Remote Desktop" si tu utilises RDP
+   - ✅ "WinRM" si tu utilises PowerShell Remoting
+   - ❌ "File and Printer Sharing" si tu ne partages rien
+
+3. **Profil** : Sur quel(s) profil(s) la règle est active
+   - `Domain` = OK pour services internes
+   - `Public` = ⚠️ Attention ! Exposé sur réseaux publics
+
+**⚠️ Règles DANGEREUSES à vérifier :**
+
+| Règle | Risque | Action |
+|-------|--------|--------|
+| File and Printer Sharing | Partages accessibles | Désactiver si non utilisé |
+| Remote Desktop (sur profil Public) | RDP exposé sur réseaux publics | Restreindre au profil Domain/Private |
+| Network Discovery | Énumération réseau | Désactiver sur Public |
+| Remote Event Log Management | Accès aux logs à distance | Désactiver si non nécessaire |
+
+**🔧 Désactiver une règle inutile :**
+
+```powershell
+# Désactive File and Printer Sharing
+Disable-NetFirewallRule -DisplayGroup "File and Printer Sharing"
+
+# Désactive Network Discovery
+Disable-NetFirewallRule -DisplayGroup "Network Discovery"
+
+# Vérifie qu'elles sont désactivées
+Get-NetFirewallRule -DisplayGroup "File and Printer Sharing" | Select-Object DisplayName, Enabled
+```
+
+### ✅ Check #4 : Règles avec Adresses Sources "Any"
+
+**C'est LE check le plus important !**
+
+Les règles qui autorisent **n'importe quelle IP source** (RemoteAddress = Any) sont les plus dangereuses.
+
+#### Commande : Trouver les règles "Any/Any"
+
+```powershell
+Get-NetFirewallRule -Direction Inbound -Enabled True | Get-NetFirewallAddressFilter | Where-Object {$_.RemoteAddress -eq 'Any'} | ForEach-Object {
+    $rule = Get-NetFirewallRule -AssociatedNetFirewallAddressFilter $_
+    [PSCustomObject]@{
+        DisplayName = $rule.DisplayName
+        RemoteAddress = $_.RemoteAddress
+        Profile = $rule.Profile
+    }
+} | Select-Object -First 20
+```
+
+**💻 Exemple de résultat :**
+
+```
+DisplayName                              RemoteAddress Profile
+-----------                              ------------- -------
+Remote Desktop - User Mode (TCP-In)      Any           Domain, Private, Public
+Windows Remote Management (HTTP-In)      Any           Domain
+Core Networking - Destination Unreac...  Any           Any
+```
+
+**🎯 Analyse règle par règle :**
+
+**Règle : Remote Desktop - RemoteAddress: Any**
+
+**Problème :** N'importe qui sur Internet peut essayer de se connecter en RDP !
+
+**Solution :** Restreindre aux IPs admin (déjà vu dans Partie 3)
+
+```powershell
+# Supprime la règle RDP par défaut
+Remove-NetFirewallRule -DisplayGroup "Remote Desktop"
+
+# Recrée avec restriction IP
+New-NetFirewallRule -DisplayName "RDP - Admin IP Only" -Direction Inbound -LocalPort 3389 -Protocol TCP -Action Allow -RemoteAddress "192.168.1.100"
+```
+
+**Règle : Core Networking**
+
+**Analyse :** Les règles "Core Networking" sont souvent nécessaires pour le fonctionnement réseau de base (ICMP, etc.)
+
+**Action :** Garder, mais vérifier si vraiment nécessaire
+
+### ✅ Check #5 : Empêcher les Utilisateurs de Désactiver le Pare-feu
+
+**Scénario :** Un admin junior ou un utilisateur avec droits locaux désactive le pare-feu "pour tester un truc" et oublie de le réactiver...
+
+#### Commande : Vérifier si le pare-feu peut être désactivé localement
+
+Via GPO (Group Policy), tu peux **verrouiller** le pare-feu.
+
+**🔧 Configuration recommandée (via GPO ou registre) :**
+
+```powershell
+# Empêche la désactivation du pare-feu pour le profil Domain
+Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\WindowsFirewall\DomainProfile" -Name "DisableNotifications" -Value 1
+
+# Empêche les utilisateurs de désactiver le pare-feu
+# (Nécessite GPO pour être vraiment efficace)
+```
+
+**💡 Meilleure pratique :** Utilise Group Policy pour forcer l'activation du pare-feu sur tous les serveurs du domaine.
+
+### 📊 Récapitulatif Partie 4
+
+**✅ Checklist - Pare-feu Windows Defender :**
+- [ ] Pare-feu activé sur les 3 profils (Domain, Private, Public)
+- [ ] DefaultInboundAction = Block (sur tous les profils)
+- [ ] DefaultOutboundAction = Allow (ou Block si très restrictif)
+- [ ] Nombre de règles entrantes < 20
+- [ ] Toutes les règles actives justifiées et documentées
+- [ ] Règles dangereuses désactivées (File Sharing, Network Discovery sur Public)
+- [ ] RDP restreint par IP (si actif)
+- [ ] Aucune règle "Any/Any" inutile
+- [ ] Pare-feu verrouillé via GPO (impossible à désactiver)
+
+**🎓 Ce que tu maîtrises maintenant :**
+- ✅ Comprendre les 3 profils de pare-feu Windows
+- ✅ Vérifier et activer le pare-feu sur tous les profils
+- ✅ Configurer les politiques par défaut (Block/Allow)
+- ✅ Auditer les règles entrantes actives
+- ✅ Identifier les règles dangereuses (RemoteAddress: Any)
+- ✅ Désactiver les règles inutiles
+- ✅ Restreindre les règles par adresse IP source
+
+**Niveau actuel : 🌟🌟🌟🌟 Avancé !**
+
+---
+
+## 🦠 PARTIE 5 : Windows Defender - Ton Antivirus Intégré
+
+### 🎓 Concept : Windows Defender = Le Système Immunitaire de ton Serveur
+
+**Analogie :** Windows Defender, c'est comme le système immunitaire de ton corps :
+- **Actif** = Détecte et élimine les virus en temps réel
+- **Désactivé** = Tu attrapes toutes les maladies qui passent
+
+**Windows Defender est GRATUIT, intégré à Windows, et très efficace !**
+
+**Statistiques :**
+- Windows Defender détecte **99,7%** des malwares connus (AV-Comparatives 2024)
+- Protection en temps réel bloque **5+ milliards** de menaces par mois
+- Mais 30% des serveurs l'ont désactivé "pour des raisons de performance" 🤦
+
+### ✅ Check #1 : Windows Defender Est-il Actif ?
+
+#### Commande : Vérifier le statut complet
+
+```powershell
+Get-MpComputerStatus | Select-Object AntivirusEnabled, RealTimeProtectionEnabled, BehaviorMonitorEnabled, IoavProtectionEnabled, AntivirusSignatureLastUpdated
+```
+
+**💻 Résultat ATTENDU :**
+
+```
+AntivirusEnabled              : True
+RealTimeProtectionEnabled     : True
+BehaviorMonitorEnabled        : True
+IoavProtectionEnabled         : True
+AntivirusSignatureLastUpdated : 1/16/2025 2:00:00 AM
+```
+
+**🔍 Analyse complète :**
+
+| Paramètre | Valeur IDÉALE | Signification |
+|-----------|---------------|---------------|
+| `AntivirusEnabled` | **True** | Windows Defender est activé |
+| `RealTimeProtectionEnabled` | **True** | Scan en temps réel des fichiers |
+| `BehaviorMonitorEnabled` | **True** | Détection par comportement (heuristique) |
+| `IoavProtectionEnabled` | **True** | Protection Office (macros malveillantes) |
+| `AntivirusSignatureLastUpdated` | **< 7 jours** | Signatures à jour |
+
+**📚 Explication des protections :**
+
+**RealTimeProtection (Temps Réel) :**
+- Scanne CHAQUE fichier que tu ouvres/télécharges
+- Bloque les malwares AVANT qu'ils ne s'exécutent
+- **C'est LA protection la plus importante !**
+
+**BehaviorMonitor (Surveillance Comportementale) :**
+- Détecte les malwares **sans signature** connue
+- Exemple : Un fichier essaie d'accéder à 1000 fichiers en 2 secondes = Comportement de ransomware → BLOQUÉ !
+
+**IoavProtection (Office et navigateur) :**
+- Protège contre les documents Office malveillants (macros)
+- Scanne les téléchargements depuis les navigateurs
+
+**❌ PROBLÈME - Defender désactivé :**
+
+```
+AntivirusEnabled              : False   ← DANGER !
+RealTimeProtectionEnabled     : False   ← DANGER !
+```
+
+**🔧 Correction URGENTE :**
+
+```powershell
+# Active toutes les protections
+Set-MpPreference -DisableRealtimeMonitoring $false
+Set-MpPreference -DisableBehaviorMonitoring $false
+Set-MpPreference -DisableIOAVProtection $false
+
+# Vérifie
+Get-MpComputerStatus | Select-Object AntivirusEnabled, RealTimeProtectionEnabled
+```
+
+### ✅ Check #2 : Signatures Antivirus À Jour
+
+#### Commande : Voir la date des dernières signatures
+
+```powershell
+Get-MpComputerStatus | Select-Object AntivirusSignatureLastUpdated, AntivirusSignatureVersion, NISSignatureLastUpdated
+```
+
+**💻 Résultat ATTENDU :**
+
+```
+AntivirusSignatureLastUpdated : 1/16/2025 2:00:00 AM
+AntivirusSignatureVersion     : 1.405.217.0
+NISSignatureLastUpdated       : 1/16/2025 2:00:00 AM
+```
+
+**🎯 Dates à vérifier :**
+
+| Ancienneté | Statut | Action |
+|------------|--------|--------|
+| < 24 heures | ✅ EXCELLENT | RAS |
+| 1-7 jours | 🟡 ACCEPTABLE | Mettre à jour |
+| 7-30 jours | 🟠 PROBLÈME | Mettre à jour MAINTENANT |
+| > 30 jours | 🔴 CRITIQUE | Serveur probablement infecté |
+
+**💡 Pourquoi c'est important ?**
+
+Chaque jour, **350 000 nouveaux malwares** sont créés. Des signatures vieilles de 30 jours = Tu ne détectes PAS 10+ millions de malwares récents !
+
+**🔧 Mettre à jour les signatures :**
+
+```powershell
+# Met à jour les signatures immédiatement
+Update-MpSignature
+
+# Vérifie la nouvelle date
+Get-MpComputerStatus | Select-Object AntivirusSignatureLastUpdated
+```
+
+**⏱️ Temps de mise à jour :** 30 secondes à 2 minutes selon ta connexion
+
+### ✅ Check #3 : Exclusions (Le Point Faible)
+
+**Les exclusions** = Fichiers/dossiers que Windows Defender **NE scanne PAS**
+
+**Pourquoi c'est dangereux ?**
+- Les malwares adorent se cacher dans les dossiers exclus
+- Un attaquant qui compromet ton serveur va essayer d'ajouter des exclusions
+
+#### Commande : Lister toutes les exclusions
+
+```powershell
+Get-MpPreference | Select-Object ExclusionPath, ExclusionExtension, ExclusionProcess
+```
+
+**💻 Résultat IDÉAL :**
+
+```
+ExclusionPath      :
+ExclusionExtension :
+ExclusionProcess   :
+```
+
+**(Vide = Aucune exclusion = ✅ PARFAIT !)**
+
+**💻 Résultat ACCEPTABLE (avec justifications) :**
+
+```
+ExclusionPath      : {C:\DatabaseFiles, C:\TempBuild}
+ExclusionExtension : {}
+ExclusionProcess   : {sqlservr.exe}
+```
+
+**✅ Analyse :**
+- `C:\DatabaseFiles` = Fichiers de base de données (performance)
+- `sqlservr.exe` = SQL Server (exclusion courante recommandée par Microsoft)
+
+**Ces exclusions DOIVENT être :**
+1. **Documentées** (tu sais pourquoi elles existent)
+2. **Justifiées** (vraie raison de performance ou compatibilité)
+3. **Minimales** (le moins possible)
+
+**❌ EXCLUSIONS DANGEREUSES :**
+
+```
+ExclusionPath      : {C:\, C:\Windows\System32, C:\Users}
+ExclusionExtension : {.exe, .dll, .ps1}
+ExclusionProcess   : {}
+```
+
+**🚨 ALERTE ROUGE :**
+
+| Exclusion | Problème |
+|-----------|----------|
+| `C:\` | Windows Defender ne scanne PLUS RIEN sur le disque C: ! |
+| `C:\Windows\System32` | Dossier système pas scanné = Malware peut s'y cacher |
+| `*.exe` | AUCUN exécutable scanné = Defender complètement contourné |
+| `*.ps1` | Scripts PowerShell malveillants pas détectés |
+
+**Ces exclusions = Désactiver complètement Windows Defender !**
+
+**🔧 Supprimer les exclusions dangereuses :**
+
+```powershell
+# Supprime TOUTES les exclusions de chemins
+Remove-MpPreference -ExclusionPath (Get-MpPreference).ExclusionPath
+
+# Supprime les exclusions d'extensions
+Remove-MpPreference -ExclusionExtension (Get-MpPreference).ExclusionExtension
+
+# Vérifie
+Get-MpPreference | Select-Object ExclusionPath, ExclusionExtension
+```
+
+**⚠️ Attention :** Si des exclusions sont légitimes (SQL Server, etc.), ne les supprime pas toutes ! Supprime seulement les dangereuses :
+
+```powershell
+# Supprime UNE exclusion spécifique
+Remove-MpPreference -ExclusionPath "C:\"
+Remove-MpPreference -ExclusionExtension ".exe"
+```
+
+### ✅ Check #4 : Cloud Protection et Soumission d'Échantillons
+
+Windows Defender peut envoyer des fichiers suspects à Microsoft pour analyse en temps réel.
+
+#### Commande : Vérifier Cloud Protection
+
+```powershell
+Get-MpPreference | Select-Object MAPSReporting, SubmitSamplesConsent
+```
+
+**💻 Résultat RECOMMANDÉ :**
+
+```
+MAPSReporting        : Advanced
+SubmitSamplesConsent : SendAllSamples
+```
+
+**🔍 Valeurs possibles :**
+
+**MAPSReporting** (Microsoft Active Protection Service) :
+
+| Valeur | Niveau | Recommandé ? |
+|--------|--------|--------------|
+| Disabled | Pas de cloud | ❌ Perd 30% d'efficacité |
+| Basic | Protection basique | 🟡 OK |
+| **Advanced** | **Protection maximale** | ✅ **RECOMMANDÉ** |
+
+**SubmitSamplesConsent** :
+
+| Valeur | Signification | Recommandé ? |
+|--------|---------------|--------------|
+| NeverSend | Ne jamais envoyer | ❌ |
+| PromptBeforeSending | Demander | 🟡 Serveur = pas d'utilisateur pour répondre |
+| **SendAllSamples** | **Envoyer automatiquement** | ✅ **RECOMMANDÉ** |
+
+**🔧 Activer Cloud Protection :**
+
+```powershell
+# Active Cloud Protection au niveau Advanced
+Set-MpPreference -MAPSReporting Advanced
+
+# Autorise l'envoi automatique d'échantillons
+Set-MpPreference -SubmitSamplesConsent SendAllSamples
+```
+
+**💡 Confidentialité :** Si tu as des fichiers ultra-confidentiels, tu peux mettre `MAPSReporting: Basic` au lieu d'Advanced.
+
+### ✅ Check #5 : Historique des Menaces Détectées
+
+#### Commande : Voir les dernières menaces
+
+```powershell
+Get-MpThreatDetection | Select-Object -First 10
+```
+
+**💻 Si aucune menace détectée (PARFAIT) :**
+
+```
+(Vide)
+```
+
+**💻 Si menaces détectées :**
+
+```
+ActionSuccess     : True
+DomainUser        : NT AUTHORITY\SYSTEM
+InitialDetectionTime : 1/15/2025 10:23:45 AM
+ProcessName       : C:\Users\Admin\Downloads\setup.exe
+Resources         : {file:_C:\Users\Admin\Downloads\setup.exe}
+ThreatID          : 2147735503
+ThreatName        : Trojan:Win32/Meterpreter.A
+```
+
+**🔍 Analyse :**
+
+| Champ | Valeur | Signification |
+|-------|--------|---------------|
+| `ActionSuccess` | True | Menace bloquée avec succès ✅ |
+| `ThreatName` | Trojan:Win32/Meterpreter.A | Type de malware détecté |
+| `ProcessName` | setup.exe | Fichier infecté |
+| `InitialDetectionTime` | Date | Quand la menace a été détectée |
+
+**✅ Si `ActionSuccess: True`** = Windows Defender a bloqué la menace, tout va bien !
+
+**❌ Si `ActionSuccess: False`** = La menace N'A PAS été bloquée → Investigation nécessaire !
+
+**🔧 Si menace non bloquée :**
+
+```powershell
+# Lance un scan complet immédiatement
+Start-MpScan -ScanType FullScan
+
+# Nettoie les menaces détectées
+Remove-MpThreat
+
+# Vérifie qu'il n'y a plus de menaces actives
+Get-MpThreat
+```
+
+### 📊 Récapitulatif Partie 5
+
+**✅ Checklist - Windows Defender :**
+- [ ] AntivirusEnabled = True
+- [ ] RealTimeProtectionEnabled = True
+- [ ] BehaviorMonitorEnabled = True
+- [ ] Signatures < 7 jours
+- [ ] Exclusions justifiées uniquement (idéalement aucune)
+- [ ] Pas d'exclusions larges (C:\, *.exe, etc.)
+- [ ] Cloud Protection activé (MAPSReporting = Advanced)
+- [ ] Soumission automatique d'échantillons activée
+- [ ] Historique des menaces vérifié
+- [ ] Aucune menace active non bloquée
+
+**🎓 Ce que tu maîtrises maintenant :**
+- ✅ Vérifier le statut complet de Windows Defender
+- ✅ Comprendre les différentes protections (temps réel, comportementale, IOAV)
+- ✅ Mettre à jour les signatures antivirus
+- ✅ Auditer et nettoyer les exclusions dangereuses
+- ✅ Activer Cloud Protection pour efficacité maximale
+- ✅ Analyser l'historique des menaces détectées
+- ✅ Lancer des scans manuels en cas de suspicion
+
+**Niveau actuel : 🌟🌟🌟🌟🌟 Avancé+ !**
+
+---
+
+## 📝 PARTIE 6 : Audit et Journalisation - Ne Rien Rater
+
+### 🎓 Concept : Les Logs = La Boîte Noire de ton Serveur
+
+**Analogie :** Les logs Windows, c'est comme la boîte noire d'un avion :
+- **Avec logs** = Tu peux remonter le fil de toute action (qui s'est connecté, quand, depuis où)
+- **Sans logs** = Un piratage se produit, tu ne sauras jamais comment
+
+**Statistiques terrifiantes :**
+- **277 jours** = Temps moyen pour détecter une intrusion (IBM Security 2024)
+- 60% des entreprises n'ont PAS de logs d'audit configurés
+- Sans logs, impossible de prouver une compromission ou respecter les normes (RGPD, PCI-DSS, etc.)
+
+### ✅ Check #1 : Politique d'Audit Avancée
+
+Windows peut auditer des dizaines d'événements. On va se concentrer sur les **critiques**.
+
+#### Commande : Voir la politique d'audit actuelle
+
+```powershell
+auditpol /get /category:*
+```
+
+**💻 Résultat (extrait) :**
+
+```
+System Audit Policy
+Category/Subcategory                      Setting
+Logon/Logoff
+  Logon                                   Success and Failure
+  Logoff                                  Success
+  Account Lockout                         Failure
+  Special Logon                           Success
+
+Account Management
+  User Account Management                 Success and Failure
+  Security Group Management               Success
+
+Policy Change
+  Audit Policy Change                     Success
+  Authentication Policy Change            Success
+```
+
+**🔍 Configuration RECOMMANDÉE (CIS Benchmark Level 1) :**
+
+| Catégorie | Sous-catégorie | Audit | Pourquoi |
+|-----------|----------------|-------|----------|
+| **Logon/Logoff** | Logon | Success + Failure | Voir qui se connecte (et qui échoue) |
+| | Logoff | Success | Voir quand quelqu'un se déconnecte |
+| | Account Lockout | Failure | Détecte les attaques brute-force |
+| | Special Logon | Success | Connexions avec privilèges élevés |
+| **Account Management** | User Account Management | Success + Failure | Détecte création/suppression de comptes |
+| | Security Group Management | Success | Modification des groupes admin |
+| **Policy Change** | Audit Policy Change | Success | Détecte si quelqu'un change les audits |
+| | Authentication Policy Change | Success | Modification politique de mot de passe |
+| **Privilege Use** | Sensitive Privilege Use | Success + Failure | Utilisation de droits sensibles |
+| **System** | Security State Change | Success | Démarrage/arrêt du serveur |
+| | System Integrity | Success + Failure | Violation d'intégrité système |
+
+**✅ Pourquoi "Success AND Failure" ?**
+
+- **Success** = Actions réussies (qui s'est connecté)
+- **Failure** = Actions échouées (tentatives d'intrusion !)
+
+**Exemple :**
+- `Logon: Success` → Tu vois : "Admin s'est connecté à 10h"
+- `Logon: Failure` → Tu vois : "Quelqu'un a essayé le mot de passe 'Password123' 50 fois depuis une IP chinoise"
+
+**🔧 Activer les audits recommandés :**
+
+```powershell
+# Logon/Logoff
+auditpol /set /subcategory:"Logon" /success:enable /failure:enable
+auditpol /set /subcategory:"Logoff" /success:enable
+auditpol /set /subcategory:"Account Lockout" /failure:enable
+auditpol /set /subcategory:"Special Logon" /success:enable
+
+# Account Management
+auditpol /set /subcategory:"User Account Management" /success:enable /failure:enable
+auditpol /set /subcategory:"Security Group Management" /success:enable
+
+# Policy Change
+auditpol /set /subcategory:"Audit Policy Change" /success:enable
+auditpol /set /subcategory:"Authentication Policy Change" /success:enable
+
+# Privilege Use
+auditpol /set /subcategory:"Sensitive Privilege Use" /success:enable /failure:enable
+
+# System
+auditpol /set /subcategory:"Security State Change" /success:enable
+auditpol /set /subcategory:"System Integrity" /success:enable /failure:enable
+
+# Vérifie que c'est appliqué
+auditpol /get /category:*
+```
+
+### ✅ Check #2 : Taille du Journal de Sécurité
+
+Les logs sont stockés dans le **journal de sécurité** (Security log).
+
+**Problème :** Par défaut, le journal fait seulement **20 MB** → Il se remplit en quelques jours et écrase les vieux logs !
+
+#### Commande : Voir la taille actuelle
+
+```powershell
+Get-EventLog -List | Where-Object {$_.Log -eq "Security"}
+```
+
+**💻 Résultat :**
+
+```
+Max(K) Retain OverflowAction        Entries Log
+------ ------ --------------        ------- ---
+20,480      0 OverwriteAsNeeded      15,234 Security
+```
+
+**🔍 Analyse :**
+
+| Champ | Valeur | Signification | Bon ? |
+|-------|--------|---------------|-------|
+| `Max(K)` | 20,480 | Taille max = 20 MB | ❌ TROP PETIT |
+| `OverflowAction` | OverwriteAsNeeded | Écrase les vieux logs quand plein | ⚠️ Perte d'historique |
+| `Entries` | 15,234 | Nombre d'événements actuels | ℹ️ |
+
+**🎯 Taille RECOMMANDÉE :**
+
+| Environnement | Taille recommandée |
+|---------------|--------------------|
+| Serveur peu sollicité | **100 MB** minimum |
+| Serveur normal | **512 MB** à **1 GB** |
+| Serveur critique/AD/DC | **2 GB** à **4 GB** |
+
+**🔧 Augmenter la taille à 1 GB :**
+
+```powershell
+# Augmente la taille à 1 GB (1073741824 octets)
+wevtutil sl Security /ms:1073741824
+
+# Vérifie
+Get-EventLog -List | Where-Object {$_.Log -eq "Security"}
+```
+
+**💻 Résultat après modification :**
+
+```
+Max(K)    Retain OverflowAction        Entries Log
+------    ------ --------------        ------- ---
+1,048,576      0 OverwriteAsNeeded      15,234 Security
+```
+
+**✅ `Max(K): 1,048,576` = 1 GB !**
+
+### ✅ Check #3 : Événements de Connexion Récents
+
+#### Commande : Voir les 20 dernières connexions réussies
+
+```powershell
+Get-WinEvent -FilterHashtable @{LogName='Security'; ID=4624} -MaxEvents 20 | Select-Object TimeCreated, Message | Format-List
+```
+
+**🎓 Event ID Windows importants :**
+
+| Event ID | Signification | Bon/Mauvais |
+|----------|---------------|-------------|
+| **4624** | Connexion réussie | Voir qui se connecte |
+| **4625** | Connexion échouée | ⚠️ Tentatives d'intrusion |
+| **4720** | Compte créé | Surveiller créations suspectes |
+| **4726** | Compte supprimé | Surveiller suppressions |
+| **4728** | Membre ajouté à groupe sécurité | Qui devient admin ? |
+| **4732** | Membre ajouté au groupe Administrators local | Escalade de privilèges |
+| **4776** | Tentative authentification NTLM | Surveiller attaques pass-the-hash |
+
+**💻 Exemple Event ID 4624 (connexion réussie) :**
+
+```
+TimeCreated : 1/16/2025 10:23:45 AM
+Message     : An account was successfully logged on.
+
+Subject:
+    Security ID:        S-1-0-0
+    Account Name:       -
+    Account Domain:     -
+    Logon ID:           0x0
+
+Logon Information:
+    Logon Type:         10
+    Restricted Admin Mode: -
+    Virtual Account:    No
+    Elevated Token:     Yes
+
+New Logon:
+    Security ID:        S-1-5-21-xxx-xxx-xxx-1000
+    Account Name:       Administrator
+    Account Domain:     SERVER2022
+    Logon ID:           0x123456
+
+Network Information:
+    Workstation Name:   LAPTOP-ADMIN
+    Source Network Address: 192.168.1.100
+    Source Port:        54321
+```
+
+**🔍 Infos importantes :**
+
+| Champ | Valeur | Signification |
+|-------|--------|---------------|
+| `Logon Type` | 10 | RemoteInteractive (RDP) |
+| `Account Name` | Administrator | Qui s'est connecté |
+| `Source Network Address` | 192.168.1.100 | Depuis quelle IP |
+
+**📊 Logon Types courants :**
+
+| Logon Type | Méthode | Exemple |
+|------------|---------|---------|
+| 2 | Interactive | Console locale |
+| 3 | Network | Accès partage réseau |
+| 4 | Batch | Tâche planifiée |
+| 5 | Service | Démarrage service |
+| **10** | **RemoteInteractive** | **RDP** |
+| 11 | CachedInteractive | Connexion hors-ligne |
+
+**🔧 Voir les connexions ÉCHOUÉES (Event ID 4625) :**
+
+```powershell
+Get-WinEvent -FilterHashtable @{LogName='Security'; ID=4625} -MaxEvents 20 | ForEach-Object {
+    $xml = [xml]$_.ToXml()
+    [PSCustomObject]@{
+        TimeCreated = $_.TimeCreated
+        Account = $xml.Event.EventData.Data[5].'#text'
+        SourceIP = $xml.Event.EventData.Data[19].'#text'
+        FailureReason = $xml.Event.EventData.Data[8].'#text'
+    }
+}
+```
+
+**💻 Exemple (attaque brute-force détectée) :**
+
+```
+TimeCreated   Account      SourceIP        FailureReason
+-----------   -------      --------        -------------
+1/16 03:45:12 admin        185.220.101.42  0xc000006d (Bad username or password)
+1/16 03:45:15 administrator 185.220.101.42 0xc000006d (Bad username or password)
+1/16 03:45:18 root         185.220.101.42  0xc000006d (Bad username or password)
+1/16 03:45:21 test         185.220.101.42  0xc000006d (Bad username or password)
+```
+
+**🚨 ATTAQUE DÉTECTÉE !**
+- Même IP essaie plusieurs comptes
+- Intervalle de 3 secondes = Script automatique
+- IP étrangère (185.x.x.x)
+
+**✅ Solution :** Vérifie que Fail2Ban (ou équivalent Windows) a banni cette IP !
+
+### 📊 Récapitulatif Partie 6
+
+**✅ Checklist - Audit et Journalisation :**
+- [ ] Politique d'audit avancée configurée (auditpol)
+- [ ] Connexions (Logon/Logoff) : Success + Failure
+- [ ] Gestion des comptes : Success + Failure
+- [ ] Changements de politique : Success
+- [ ] Taille journal Security ≥ 512 MB (idéalement 1 GB)
+- [ ] Rétention configurée (ne pas écraser trop vite)
+- [ ] Logs vérifiés régulièrement
+- [ ] Event IDs critiques surveillés (4624, 4625, 4720, etc.)
+- [ ] Centralisation des logs (SIEM/Syslog) - optionnel mais recommandé
+
+**🎓 Ce que tu maîtrises maintenant :**
+- ✅ Configurer la politique d'audit avancée Windows
+- ✅ Comprendre les Event IDs importants
+- ✅ Augmenter la taille du journal de sécurité
+- ✅ Analyser les connexions (réussies et échouées)
+- ✅ Détecter les tentatives d'intrusion dans les logs
+- ✅ Identifier les Logon Types (RDP, réseau, service, etc.)
+- ✅ Créer des filtres PowerShell pour extraire les événements critiques
+
+**Niveau actuel : 🌟🌟🌟🌟🌟🌟 Expert !**
+
+---
+
+*[Guide Windows Server 2022 - Parties 7-10 + Script + Conclusion à venir]*
 
 **Parties suivantes :**
-- Partie 4 : Pare-feu Windows Defender
-- Partie 5 : Windows Defender et Antivirus
-- Partie 6 : Audit et Journalisation
 - Partie 7 : Services Windows
 - Partie 8 : Partages Réseau (SMB)
 - Partie 9 : User Account Control (UAC)
@@ -1200,4 +2083,4 @@ Write-Host "Pare-feu: Restreint à $AdminIP" -ForegroundColor Green
 
 ---
 
-*Transformation en cours... La suite arrive bientôt !*
+*Transformation en cours... Les dernières parties arrivent bientôt !*
